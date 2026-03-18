@@ -73,11 +73,7 @@ export const LicenseProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Call license verification edge function with current token
-      const { data, error } = await supabase.functions.invoke('license-verify', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      });
+      const { data, error } = await supabase.functions.invoke('license-verify');
 
       if (error) {
         console.error('License check error:', error);

@@ -19,7 +19,7 @@ export const useAccountId = () => {
         // Priority: use account_id from profile (source of truth for multi-tenant)
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('account_id')
+          .select('id, account_id')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -44,7 +44,20 @@ export const useAccountId = () => {
           console.error('Error fetching owned account:', ownerError);
         }
 
-        setAccountId(ownedAccount?.id || null);
+        if (ownedAccount?.id) {
+          try {
+            if (profile) {
+              await supabase.from("profiles").update({ account_id: ownedAccount.id }).eq("id", user.id);
+            } else {
+              await supabase.from("profiles").insert({ id: user.id, account_id: ownedAccount.id });
+            }
+          } catch {
+            // best effort
+          }
+          setAccountId(ownedAccount.id);
+        } else {
+          setAccountId(null);
+        }
       } catch (error) {
         console.error('Unexpected error fetching account_id:', error);
         setAccountId(null);

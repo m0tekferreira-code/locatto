@@ -314,7 +314,12 @@ const ImportConciliacao = () => {
 
       if (owned?.id) {
         try {
-          await supabase.from("profiles").upsert({ id: user.id, account_id: owned.id });
+          const { data: existingProfile } = await supabase.from("profiles").select("id").eq("id", user.id).maybeSingle();
+          if (existingProfile) {
+            await supabase.from("profiles").update({ account_id: owned.id }).eq("id", user.id);
+          } else {
+            await supabase.from("profiles").insert({ id: user.id, account_id: owned.id });
+          }
         } catch {
           // profile sync is best effort
         }
@@ -340,7 +345,12 @@ const ImportConciliacao = () => {
       if (error) throw error;
 
       try {
-        await supabase.from("profiles").upsert({ id: user.id, account_id: created.id });
+        const { data: extProf } = await supabase.from("profiles").select("id").eq("id", user.id).maybeSingle();
+        if (extProf) {
+          await supabase.from("profiles").update({ account_id: created.id }).eq("id", user.id);
+        } else {
+          await supabase.from("profiles").insert({ id: user.id, account_id: created.id });
+        }
       } catch {
         // profile sync is best effort
       }
