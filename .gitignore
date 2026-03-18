@@ -22,3 +22,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables (nunca commitar!)
+.env
+.env.local
+.env.production
+.env.development
+*.env.backup
+
+# Supabase local
+.supabase/
+!supabase/config.toml
+!supabase/migrations/
+!supabase/functions/
+
+# Sensitive files
+APPLY_THIS_FIX_NOW.sql.backup
+*.pem
+*.key
+*-credentials.json

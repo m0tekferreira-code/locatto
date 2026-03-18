@@ -1,0 +1,32 @@
+name: Apply Emergency RLS Fix
+
+on:
+  workflow_dispatch: # Apenas execução manual
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link projeto Supabase
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PROJECT_ID: esinwvukarglzeoxioni
+        run: |
+          supabase link --project-ref $PROJECT_ID
+
+      - name: Executar APPLY_THIS_FIX_NOW.sql
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase db execute APPLY_THIS_FIX_NOW.sql --password $SUPABASE_DB_PASSWORD

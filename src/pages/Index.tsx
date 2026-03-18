@@ -13,11 +13,16 @@ import { useOverdueBreakdown } from "@/hooks/dashboard/useOverdueBreakdown";
 import { usePropertySummary } from "@/hooks/dashboard/usePropertySummary";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountId } from "@/hooks/useAccountId";
+import { useRlsAutoDetect } from "@/hooks/useRlsAutoDetect";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Index = () => {
   const { user } = useAuth();
   const { accountId } = useAccountId();
+  
+  // Auto-detectar problemas de RLS e sugerir correção
+  useRlsAutoDetect();
+  
   const { data: stats, isLoading: statsLoading } = useDashboardStats(user?.id, accountId);
   const { data: invoices, isLoading: invoicesLoading } = useRecentInvoices(user?.id, accountId, 10);
   const { data: overdueData, isLoading: overdueLoading } = useOverdueBreakdown(user?.id, accountId);

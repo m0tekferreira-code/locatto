@@ -159,3 +159,39 @@ acordus/
 ---
 
 *Para o uso em produção, lembre-se de configurar as Edge Functions de migrações em sua plataforma de hospedagem ou provedores compatíveis (como Vercel, Netlify ou própria cloud).*
+
+---
+
+## 🚀 Deploy Automático
+
+O projeto está configurado para deploy automático:
+
+- **Frontend**: Deploy automático via Vercel quando há push na `main`
+- **Backend/Migrations**: Deploy automático via GitHub Actions quando há mudanças em `supabase/migrations/`
+
+### Configuração Rápida
+
+1. **Frontend já está no ar**: https://locatto.vercel.app/ ✅
+
+2. **Configurar migrations automáticas**: 
+   - Leia: [SETUP_GITHUB_ACTIONS.md](./SETUP_GITHUB_ACTIONS.md)
+   - Configure 2 secrets no GitHub (Access Token + DB Password)
+   - Execute o workflow "Apply Emergency RLS Fix" uma vez
+
+3. **Pronto!** A partir daí:
+   - Todo push em `main` → Deploy automático na Vercel
+   - Todo push em `supabase/migrations/` → Aplica migration automaticamente no Supabase
+
+### Documentação Completa
+
+- 📖 [DEPLOY_AUTOMATICO.md](./DEPLOY_AUTOMATICO.md) - Guia completo de deploy
+- 🔧 [SETUP_GITHUB_ACTIONS.md](./SETUP_GITHUB_ACTIONS.md) - Configurar CI/CD de migrations
+- 🚨 [APPLY_THIS_FIX_NOW.sql](./APPLY_THIS_FIX_NOW.sql) - Fix emergencial de RLS
+
+### Monitoramento
+
+- **Vercel**: https://vercel.com/dashboard
+- **GitHub Actions**: https://github.com/[SEU_USER]/acordus/actions
+- **Supabase**: https://supabase.com/dashboard/project/esinwvukarglzeoxioni
+
+---

@@ -1,7 +1,17 @@
 -- ⚠️ AÇÃO URGENTE: Rode este SQL no Supabase Dashboard → SQL Editor
 -- Este script corrige o bloqueio RLS que está causando os erros 403/401
 -- 
--- Como aplicar:
+-- ========================================
+-- OPÇÃO 1: Via GitHub Actions (RECOMENDADO)
+-- ========================================
+-- 1. Configure os secrets no GitHub (veja SETUP_GITHUB_ACTIONS.md)
+-- 2. Acesse: https://github.com/[SEU_USER]/acordus/actions
+-- 3. Execute o workflow "Apply Emergency RLS Fix"
+-- 4. Recarregue o app: https://locatto.vercel.app/
+--
+-- ========================================
+-- OPÇÃO 2: Manual no Dashboard
+-- ========================================
 -- 1. Acesse: https://supabase.com/dashboard/project/esinwvukarglzeoxioni/sql/new
 -- 2. Cole TODO este conteúdo
 -- 3. Clique em "RUN" 

@@ -313,14 +313,8 @@ const ImportConciliacao = () => {
         .maybeSingle();
 
       if (owned?.id) {
-        try {
-          await supabase.from("profiles").upsert({ 
-            id: user.id, 
-            account_id: owned.id 
-          }, { onConflict: 'id' });
-        } catch {
-          // profile sync is best effort
-        }
+        // EMERGENCY FIX: Skip profile upsert to avoid 403 until RLS fix is applied
+        // The profile->account linkage will be done via SQL migration later
         return owned.id;
       }
     } catch {
@@ -342,14 +336,8 @@ const ImportConciliacao = () => {
 
       if (error) throw error;
 
-      try {
-        await supabase.from("profiles").upsert({ 
-          id: user.id, 
-          account_id: created.id 
-        }, { onConflict: 'id' });
-      } catch {
-        // profile sync is best effort
-      }
+      // EMERGENCY FIX: Skip profile upsert to avoid 403 until RLS fix is applied
+      // The profile->account linkage will be done via SQL migration later
 
       return created.id;
     } catch {

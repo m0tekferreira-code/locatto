@@ -44,15 +44,8 @@ export default function CompleteAccountSetup() {
 
       if (accountError) throw accountError;
 
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert({
-          id: user.id,
-          account_id: createdAccount.id,
-          full_name: (user.user_metadata?.full_name as string) || null,
-        });
-
-      if (profileError) throw profileError;
+      // EMERGENCY FIX: Profile will be created automatically by handle_new_user trigger
+      // or linked via SQL migration. Skip manual upsert to avoid 403 until RLS fix is applied.
 
       toast.success("Cadastro concluído com sucesso.");
       navigate("/");

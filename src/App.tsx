@@ -42,6 +42,7 @@ import ImportConciliacao from "./pages/Settings/ImportConciliacao";
 import ContactsList from "./pages/Contacts/ContactsList";
 import ContactDetails from "./pages/Contacts/ContactDetails";
 import InspectionWizard from "./pages/Inspections/InspectionWizard";
+import RlsFixPage from "./pages/Admin/RlsFixPage";
 
 const queryClient = new QueryClient();
 
@@ -204,6 +205,13 @@ const App = () => (
               <ProtectedRoute>
                 <AdminRoute>
                   <LicenseManagement />
+                </AdminRoute>
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/rls-fix" element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <RlsFixPage />
                 </AdminRoute>
               </ProtectedRoute>
             } />

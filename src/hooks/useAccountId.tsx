@@ -6,7 +6,6 @@ export const useAccountId = () => {
   const { user } = useAuth();
   const [accountId, setAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [retryAttempted, setRetryAttempted] = useState(false);
 
   useEffect(() => {
     const fetchAccountId = async () => {
@@ -46,24 +45,11 @@ export const useAccountId = () => {
         }
 
         if (ownedAccount?.id) {
-          // Try to sync profile.account_id once (avoid infinite retry loop)
-          if (!retryAttempted && !profile?.account_id) {
-            try {
-              const { error: upsertError } = await supabase.from("profiles").upsert({ 
-                id: user.id, 
-                account_id: ownedAccount.id 
-              }, { onConflict: 'id' });
-              
-              if (upsertError) {
-                console.warn('Profile sync failed (RLS policy may be missing):', upsertError.message);
-              }
-            } catch (err) {
-              console.warn('Profile sync attempt failed:', err);
-            } finally {
-              setRetryAttempted(true);
-            }
-          }
+          // EMERGENCY FIX: Skip profile upsert, use account_id directly from owned account
+          // This allows app to work even without the RLS fix applied to database
+          // The profile->account linkage can be done later via SQL migration
           setAccountId(ownedAccount.id);
+          console.info('Using account_id from owned account (profile not synced yet)');
         } else {
           setAccountId(null);
         }
