@@ -1,0 +1,1 @@
+UPDATE contracts SET status = 'terminated', updated_at = now() WHERE id = 'f8489c6a-2570-4808-96a9-45caab3cfd9c';

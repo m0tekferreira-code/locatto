@@ -1,0 +1,52 @@
+project_id = "esinwvukarglzeoxioni"
+
+[functions.admin-create-user]
+verify_jwt = true
+
+[functions.admin-update-user]
+verify_jwt = true
+
+[functions.admin-delete-user]
+verify_jwt = true
+
+[functions.admin-list-users]
+verify_jwt = true
+
+[functions.generate-invoices]
+verify_jwt = true
+
+[functions.license-verify]
+verify_jwt = true
+
+[functions.admin-update-license]
+verify_jwt = true
+
+[functions.payment-webhook]
+verify_jwt = false
+
+[functions.checkout-session]
+verify_jwt = true
+
+[functions.cakto-webhook]
+verify_jwt = false
+
+[functions.check-payment-status]
+verify_jwt = true
+
+[functions.invoice-reminders]
+verify_jwt = false
+
+[functions.generate-lancamentos-contrato]
+verify_jwt = true
+
+[functions.financial-dashboard]
+verify_jwt = true
+
+[functions.generate-portal-feed]
+verify_jwt = false
+
+[functions.send-cobranca-webhook]
+verify_jwt = false
+
+[functions.analisar-extrato]
+verify_jwt = false
