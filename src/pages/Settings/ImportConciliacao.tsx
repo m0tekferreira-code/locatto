@@ -1,4 +1,4 @@
-﻿import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AppLayout } from "@/components/Layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,17 @@ interface ContactRow {
   contractActive: string;
   status?: "pending" | "success" | "error" | "duplicate";
   message?: string;
+  propertyName?: string;
+  address?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  ownerEmail?: string;
 }
 
 interface ContractRow {
@@ -387,6 +398,17 @@ const ImportConciliacao = () => {
             birthDate: parseDateAny(valueByAliases(row, ["Data de Nascimento", "Nascimento"])),
             contractNumber: valueByAliases(row, ["Contrato", "Nº do Contrato", "No do Contrato", "Numero do Contrato"]),
             contractActive: valueByAliases(row, ["Contrato Ativo", "Ativo"]),
+            propertyName: valueByAliases(row, ["Nome do imovel", "Imóvel", "Imovel"]),
+            address: valueByAliases(row, ["Endereço", "Endereco"]),
+            number: valueByAliases(row, ["Numero", "Número"]),
+            complement: valueByAliases(row, ["Complemento"]),
+            neighborhood: valueByAliases(row, ["Bairro"]),
+            city: valueByAliases(row, ["Cidade"]),
+            state: valueByAliases(row, ["UF", "Estado"]),
+            postalCode: valueByAliases(row, ["CEP"]),
+            ownerName: valueByAliases(row, ["Nome proprietário", "Nome do proprietario", "Proprietário", "Proprietario"]),
+            ownerPhone: valueByAliases(row, ["Telefone_1", "Telefone do Proprietário", "Telefone proprietario"]),
+            ownerEmail: valueByAliases(row, ["Email_1", "E-mail_1", "Email do Proprietário", "Email proprietario"]),
             status: "pending" as const,
           }))
           .filter((c) => c.name);
@@ -569,6 +591,39 @@ const ImportConciliacao = () => {
 
           const { error } = await supabase.from("contacts").insert(payload);
           if (error) throw error;
+
+          if (row.propertyName) {
+            try {
+              const { data: propExists } = await supabase
+                .from("properties")
+                .select("id")
+                .eq("account_id", activeAccountId)
+                .eq("name", row.propertyName.trim())
+                .maybeSingle();
+
+              if (!propExists) {
+                await supabase.from("properties").insert({
+                  user_id: user.id,
+                  account_id: activeAccountId,
+                  name: row.propertyName.trim(),
+                  property_type: "residencial",
+                  status: (row.contractActive?.toLowerCase() === 'sim') ? 'rented' : 'available',
+                  address: row.address || row.fullAddress || "Não informado",
+                  number: row.number || null,
+                  complement: row.complement || null,
+                  neighborhood: row.neighborhood || null,
+                  city: row.city || "Não informada",
+                  state: row.state || "PR",
+                  postal_code: row.postalCode || null,
+                  owner_name: row.ownerName || null,
+                  owner_contact: row.ownerPhone || null,
+                  owner_email: row.ownerEmail || null
+                });
+              }
+            } catch (propErr) {
+               console.error("Erro ao inserir imóvel:", propErr);
+            }
+          }
 
           updated[i] = { ...row, status: "success" };
         } catch (err: any) {
