@@ -46,11 +46,10 @@ export const useAccountId = () => {
 
         if (ownedAccount?.id) {
           try {
-            if (profile) {
-              await supabase.from("profiles").update({ account_id: ownedAccount.id }).eq("id", user.id);
-            } else {
-              await supabase.from("profiles").insert({ id: user.id, account_id: ownedAccount.id });
-            }
+            await supabase.from("profiles").upsert({ 
+              id: user.id, 
+              account_id: ownedAccount.id 
+            }, { onConflict: 'id' });
           } catch {
             // best effort
           }
