@@ -6,6 +6,7 @@ export const useAccountId = () => {
   const { user } = useAuth();
   const [accountId, setAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [retryAttempted, setRetryAttempted] = useState(false);
 
   useEffect(() => {
     const fetchAccountId = async () => {
@@ -45,13 +46,22 @@ export const useAccountId = () => {
         }
 
         if (ownedAccount?.id) {
-          try {
-            await supabase.from("profiles").upsert({ 
-              id: user.id, 
-              account_id: ownedAccount.id 
-            }, { onConflict: 'id' });
-          } catch {
-            // best effort
+          // Try to sync profile.account_id once (avoid infinite retry loop)
+          if (!retryAttempted && !profile?.account_id) {
+            try {
+              const { error: upsertError } = await supabase.from("profiles").upsert({ 
+                id: user.id, 
+                account_id: ownedAccount.id 
+              }, { onConflict: 'id' });
+              
+              if (upsertError) {
+                console.warn('Profile sync failed (RLS policy may be missing):', upsertError.message);
+              }
+            } catch (err) {
+              console.warn('Profile sync attempt failed:', err);
+            } finally {
+              setRetryAttempted(true);
+            }
           }
           setAccountId(ownedAccount.id);
         } else {
@@ -66,7 +76,7 @@ export const useAccountId = () => {
     };
 
     fetchAccountId();
-  }, [user]);
+  }, [user, retryAttempted]);
 
   return { accountId, loading };
 };
