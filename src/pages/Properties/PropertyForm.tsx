@@ -118,6 +118,25 @@ const PropertyForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!user?.id) {
+      toast({
+        title: "Sessão inválida",
+        description: "Faça login novamente para continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!accountId) {
+      toast({
+        title: "Conta não vinculada",
+        description: "Seu perfil ainda não está vinculado a uma conta. Recarregue a página e tente novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -134,7 +153,7 @@ const PropertyForm = () => {
 
       // Prepare insert data with only defined values
       const insertData: any = {
-        user_id: user?.id,
+        user_id: user.id,
         account_id: accountId,
         name: validatedData.name,
         property_type: validatedData.property_type,

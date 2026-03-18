@@ -87,6 +87,16 @@ export function ImportPropertiesDialog() {
 
   const handleImport = async () => {
     if (!user || missingFields.length > 0) return;
+
+    if (!accountId) {
+      toast({
+        title: "Conta não vinculada",
+        description: "Seu perfil ainda não está vinculado a uma conta. Recarregue a página e tente novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setImporting(true);
     let success = 0;
     let errors = 0;
@@ -183,6 +193,8 @@ export function ImportPropertiesDialog() {
               ref={fileInputRef}
               type="file"
               accept=".csv,.txt"
+              aria-label="Selecionar arquivo CSV de imóveis"
+              title="Selecionar arquivo CSV de imóveis"
               onChange={handleFileSelect}
               className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
             />
