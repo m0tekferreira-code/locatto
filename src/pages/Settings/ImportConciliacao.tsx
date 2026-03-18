@@ -371,11 +371,11 @@ const ImportConciliacao = () => {
         });
 
         const contactsSheet = sheetInfo.find((s) =>
-          s.headers.includes("nome") && s.headers.some((h) => h.includes("cpf cnpj"))
+          s.headers.includes("nome") && (s.headers.some((h) => h.includes("cpf cnpj")) || s.headers.some((h) => h.includes("cpf")))
         );
 
         const contractsSheet = sheetInfo.find((s) =>
-          s.headers.includes("inquilino") && s.headers.some((h) => h.includes("contrato"))
+          (s.headers.includes("inquilino") || s.headers.includes("nome")) && s.headers.some((h) => h.includes("contrato"))
         );
 
         const invoicesSheet = sheetInfo.find((s) =>
@@ -413,15 +413,32 @@ const ImportConciliacao = () => {
           }))
           .filter((c) => c.name);
 
-        const parsedContracts: ContractRow[] = (contractsSheet?.rows || [])
+        const rawContractRows = contractsSheet?.rows || contactsSheet?.rows || [];
+        const uniqueContractMap = new Map<string, any>();
+        
+        rawContractRows.forEach(row => {
+            const contractNumber = valueByAliases(row, ["Nº do Contrato", "No do Contrato", "Numero do Contrato", "Contrato"]);
+            if (contractNumber) {
+                // Keep only one row per contract number to avoid duplicates
+                if (!uniqueContractMap.has(contractNumber)) {
+                    uniqueContractMap.set(contractNumber, row);
+                }
+            } else {
+                // If it doesn't have a contract number, we keep it based on a dummy key or skip depending on rules.
+                // We'll skip it because contracts need an identifier/tenant
+            }
+        });
+        const contractRowsToProcess = Array.from(uniqueContractMap.values());
+
+        const parsedContracts: ContractRow[] = contractRowsToProcess
           .map((row) => {
             const vigencia = valueByAliases(row, ["Vigência", "Vigencia"]);
             const dates = parseVigencia(vigencia);
 
             return {
-              tenantName: valueByAliases(row, ["Inquilino", "Nome do Cliente", "Cliente"]),
+              tenantName: valueByAliases(row, ["Inquilino", "Nome do Cliente", "Cliente", "Nome"]),
               contractNumber: valueByAliases(row, ["Nº do Contrato", "No do Contrato", "Numero do Contrato", "Contrato"]),
-              contractStatus: valueByAliases(row, ["Status", "Situação", "Situacao"]),
+              contractStatus: valueByAliases(row, ["Status", "Situação", "Situacao", "Contrato Ativo"]),
               vigencia,
               startDate: dates.startDate,
               endDate: dates.endDate,
@@ -594,6 +611,7 @@ const ImportConciliacao = () => {
 
           if (row.propertyName) {
             try {
+              let propId: string | null = null;
               const { data: propExists } = await supabase
                 .from("properties")
                 .select("id")
@@ -602,7 +620,7 @@ const ImportConciliacao = () => {
                 .maybeSingle();
 
               if (!propExists) {
-                await supabase.from("properties").insert({
+                const { data: newProp, error: propError } = await supabase.from("properties").insert({
                   user_id: user.id,
                   account_id: activeAccountId,
                   name: row.propertyName.trim(),
@@ -618,10 +636,20 @@ const ImportConciliacao = () => {
                   owner_name: row.ownerName || null,
                   owner_contact: row.ownerPhone || null,
                   owner_email: row.ownerEmail || null
-                });
+                }).select("id").single();
+
+                if (propError) throw propError;
+                propId = newProp.id;
+              } else {
+                propId = propExists.id;
               }
-            } catch (propErr) {
+
+              if (propId && row.contractNumber) {
+                propertyIdMap.set(row.contractNumber.trim(), propId);
+              }
+            } catch (propErr: any) {
                console.error("Erro ao inserir imóvel:", propErr);
+               throw new Error(`Erro imóvel: ${propErr.message || "Falha desconhecida"}`);
             }
           }
 
@@ -653,6 +681,7 @@ const ImportConciliacao = () => {
     }
 
     const contractIdMap = new Map<string, string>();
+    const propertyIdMap = new Map<string, string>();
     const contactsByContract = new Map<string, ContactRow[]>();
 
     for (const contact of contacts) {
@@ -724,6 +753,7 @@ const ImportConciliacao = () => {
             .insert({
               user_id: user.id,
               account_id: activeAccountId,
+              property_id: propertyIdMap.get(row.contractNumber.trim()) || null,
               contract_number: row.contractNumber,
               tenant_name: tenantName,
               co_tenants: coTenants.length > 0 ? coTenants : null,
