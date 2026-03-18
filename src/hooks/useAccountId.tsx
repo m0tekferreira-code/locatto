@@ -62,7 +62,7 @@ export const useAccountId = () => {
     };
 
     fetchAccountId();
-  }, [user, retryAttempted]);
+  }, [user]);
 
   return { accountId, loading };
 };
