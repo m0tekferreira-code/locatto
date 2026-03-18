@@ -1,7 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountId } from "@/hooks/useAccountId";
-import { useLocation } from "react-router-dom";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,7 +9,6 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const { accountId, loading: accountLoading } = useAccountId();
-  const location = useLocation();
 
   if (loading || accountLoading) {
     return (
@@ -25,14 +23,6 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
-  }
-
-  if (!accountId && location.pathname !== "/completar-cadastro") {
-    return <Navigate to="/completar-cadastro" replace />;
-  }
-
-  if (accountId && location.pathname === "/completar-cadastro") {
-    return <Navigate to="/" replace />;
   }
 
   // Allow access even with expired license (read-only mode)

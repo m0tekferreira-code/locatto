@@ -42,7 +42,6 @@ import ImportConciliacao from "./pages/Settings/ImportConciliacao";
 import ContactsList from "./pages/Contacts/ContactsList";
 import ContactDetails from "./pages/Contacts/ContactDetails";
 import InspectionWizard from "./pages/Inspections/InspectionWizard";
-import CompleteAccountSetup from "./pages/CompleteAccountSetup";
 
 const queryClient = new QueryClient();
 
@@ -173,11 +172,6 @@ const App = () => (
             <Route path="/configuracoes/portais" element={
               <ProtectedRoute>
                 <PortalSettings />
-              </ProtectedRoute>
-            } />
-            <Route path="/completar-cadastro" element={
-              <ProtectedRoute>
-                <CompleteAccountSetup />
               </ProtectedRoute>
             } />
             <Route path="/vistorias" element={
