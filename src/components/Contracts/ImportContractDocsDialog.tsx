@@ -163,19 +163,25 @@ async function extractTextFromPdf(file: File): Promise<string> {
   let fullText = "";
   const pagesToRead = Math.min(pdf.numPages, 3);
 
-  for (let i = 1; i <= pagesToRead; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = content.items
-      .map((item) => {
-        if (typeof item === "object" && item !== null && "str" in item) {
-          const value = (item as { str: unknown }).str;
-          return typeof value === "string" ? value : "";
-        }
-        return "";
-      })
-      .join(" ");
-    fullText += pageText + "\n";
+  try {
+    for (let i = 1; i <= pagesToRead; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((item) => {
+          if (typeof item === "object" && item !== null && "str" in item) {
+            const value = (item as { str: unknown }).str;
+            return typeof value === "string" ? value : "";
+          }
+          return "";
+        })
+        .join(" ");
+      fullText += pageText + "\n";
+      page.cleanup();
+    }
+  } finally {
+    // Release pdfjs internal references to avoid memory accumulation across many files
+    pdf.destroy();
   }
 
   return fullText;
@@ -195,6 +201,14 @@ export function ImportContractDocsDialog({ open, onOpenChange, onComplete }: Imp
   const handleFilesSelected = useCallback(
     async (selectedFiles: FileList) => {
       if (!user?.id) return;
+
+      const MAX_FILES = 60;
+      if (selectedFiles.length > MAX_FILES) {
+        toast.warning(
+          `Selecione no máximo ${MAX_FILES} arquivos por vez para evitar travamento do navegador. Você selecionou ${selectedFiles.length}.`
+        );
+        return;
+      }
 
       setLoading(true);
 
