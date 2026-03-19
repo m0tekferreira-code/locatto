@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/Layout/AppLayout";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,12 +56,13 @@ const ContractWizard = () => {
       const { data, error } = await supabase
         .from("properties")
         .select("*")
-        .eq("id", propertyId)
+        .eq("id", propertyId!)
         .single();
 
       if (error) throw error;
       return data;
     },
+    enabled: !!propertyId,
   });
 
   const steps = [
@@ -135,18 +137,20 @@ const ContractWizard = () => {
 
       if (error) throw error;
 
-      // Update property status to rented
-      await supabase
-        .from("properties")
-        .update({ status: "rented" })
-        .eq("id", propertyId);
+      // Update property status to rented only when coming from a property
+      if (propertyId) {
+        await supabase
+          .from("properties")
+          .update({ status: "rented" })
+          .eq("id", propertyId);
+      }
 
       toast({
         title: "Sucesso!",
         description: "Contrato criado com sucesso",
       });
 
-      navigate(`/imoveis/${propertyId}`);
+      navigate(propertyId ? `/imoveis/${propertyId}` : "/contratos");
     } catch (error: any) {
       toast({
         title: "Erro ao criar contrato",
@@ -396,12 +400,10 @@ const ContractWizard = () => {
               </Select>
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="pre_paid"
                 checked={formData.pre_paid}
-                onChange={(e) => updateFormData("pre_paid", e.target.checked)}
-                className="h-4 w-4"
+                onCheckedChange={(checked) => updateFormData("pre_paid", !!checked)}
               />
               <Label htmlFor="pre_paid" className="cursor-pointer">
                 Cobrança Pré-Paga
@@ -461,56 +463,56 @@ const ContractWizard = () => {
                 <User className="h-5 w-5" />
                 Dados do Inquilino
               </h3>
-              <dl className="space-y-2 text-sm">
+              <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Nome:</dt>
-                  <dd className="font-medium">{formData.tenant_name}</dd>
+                  <span className="text-muted-foreground">Nome:</span>
+                  <span className="font-medium">{formData.tenant_name}</span>
                 </div>
                 {formData.tenant_document && (
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">CPF/CNPJ:</dt>
-                    <dd className="font-medium">{formData.tenant_document}</dd>
+                    <span className="text-muted-foreground">CPF/CNPJ:</span>
+                    <span className="font-medium">{formData.tenant_document}</span>
                   </div>
                 )}
                 {formData.tenant_rg && (
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">RG:</dt>
-                    <dd className="font-medium">{formData.tenant_rg}</dd>
+                    <span className="text-muted-foreground">RG:</span>
+                    <span className="font-medium">{formData.tenant_rg}</span>
                   </div>
                 )}
                 {formData.tenant_profession && (
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Profissão:</dt>
-                    <dd className="font-medium">{formData.tenant_profession}</dd>
+                    <span className="text-muted-foreground">Profissão:</span>
+                    <span className="font-medium">{formData.tenant_profession}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Telefone:</dt>
-                  <dd className="font-medium">{formData.tenant_phone}</dd>
+                  <span className="text-muted-foreground">Telefone:</span>
+                  <span className="font-medium">{formData.tenant_phone}</span>
                 </div>
                 {formData.tenant_emergency_phone && (
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Telefone de Emergência:</dt>
-                    <dd className="font-medium">{formData.tenant_emergency_phone}</dd>
+                    <span className="text-muted-foreground">Telefone de Emergência:</span>
+                    <span className="font-medium">{formData.tenant_emergency_phone}</span>
                   </div>
                 )}
                 {formData.tenant_email && (
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Email:</dt>
-                    <dd className="font-medium">{formData.tenant_email}</dd>
+                    <span className="text-muted-foreground">Email:</span>
+                    <span className="font-medium">{formData.tenant_email}</span>
                   </div>
                 )}
                 {formData.co_tenants.length > 0 && (
                   <div className="pt-2 border-t">
-                    <dt className="text-muted-foreground font-semibold mb-2">Outras pessoas no imóvel:</dt>
+                    <span className="text-muted-foreground font-semibold block mb-2">Outras pessoas no imóvel:</span>
                     {formData.co_tenants.map((coTenant, index) => (
-                      <dd key={index} className="ml-4 mb-1">
+                      <span key={index} className="ml-4 mb-1 block">
                         {coTenant.name} {coTenant.relationship && `(${coTenant.relationship})`}
-                      </dd>
+                      </span>
                     ))}
                   </div>
                 )}
-              </dl>
+              </div>
             </div>
 
             <div className="rounded-lg border p-4">
@@ -518,36 +520,38 @@ const ContractWizard = () => {
                 <FileCheck className="h-5 w-5" />
                 Dados do Contrato
               </h3>
-              <dl className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Imóvel:</dt>
-                  <dd className="font-medium">{property?.name}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Início:</dt>
-                  <dd className="font-medium">
-                    {new Date(formData.start_date).toLocaleDateString("pt-BR")}
-                  </dd>
-                </div>
-                {formData.end_date && (
+              <div className="space-y-2 text-sm">
+                {property?.name && (
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Término:</dt>
-                    <dd className="font-medium">
-                      {new Date(formData.end_date).toLocaleDateString("pt-BR")}
-                    </dd>
+                    <span className="text-muted-foreground">Imóvel:</span>
+                    <span className="font-medium">{property.name}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Valor do Aluguel:</dt>
-                  <dd className="font-medium text-lg text-green-600">
+                  <span className="text-muted-foreground">Início:</span>
+                  <span className="font-medium">
+                    {new Date(formData.start_date).toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+                {formData.end_date && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Término:</span>
+                    <span className="font-medium">
+                      {new Date(formData.end_date).toLocaleDateString("pt-BR")}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Valor do Aluguel:</span>
+                  <span className="font-medium text-lg text-green-600">
                     R$ {parseFloat(formData.rental_value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </dd>
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Vencimento:</dt>
-                  <dd className="font-medium">Dia {formData.payment_day}</dd>
+                  <span className="text-muted-foreground">Vencimento:</span>
+                  <span className="font-medium">Dia {formData.payment_day}</span>
                 </div>
-              </dl>
+              </div>
             </div>
 
             {formData.guarantee_type && formData.guarantee_type !== "none" && (
@@ -556,20 +560,20 @@ const ContractWizard = () => {
                   <Shield className="h-5 w-5" />
                   Garantia
                 </h3>
-                <dl className="space-y-2 text-sm">
+                <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Tipo:</dt>
-                    <dd className="font-medium capitalize">{formData.guarantee_type}</dd>
+                    <span className="text-muted-foreground">Tipo:</span>
+                    <span className="font-medium capitalize">{formData.guarantee_type}</span>
                   </div>
                   {formData.guarantee_value && (
                     <div className="flex justify-between">
-                      <dt className="text-muted-foreground">Valor:</dt>
-                      <dd className="font-medium">
+                      <span className="text-muted-foreground">Valor:</span>
+                      <span className="font-medium">
                         R$ {parseFloat(formData.guarantee_value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                      </dd>
+                      </span>
                     </div>
                   )}
-                </dl>
+                </div>
               </div>
             )}
           </div>
