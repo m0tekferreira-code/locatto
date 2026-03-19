@@ -57,6 +57,23 @@ function toDisplayName(slug: string): string {
     .join(" ");
 }
 
+function buildSafeStorageFilename(originalName: string): string {
+  const extMatch = originalName.toLowerCase().match(/\.([a-z0-9]+)$/i);
+  const ext = extMatch ? `.${extMatch[1]}` : ".pdf";
+
+  const base = originalName
+    .replace(/\.[^.]+$/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+
+  const trimmedBase = (base || "contrato").slice(0, 90);
+  return `${trimmedBase}${ext}`;
+}
+
 // Ex.: contrato_2494_ricardo_luis_mueller.pdf
 function extractMetadataFromFilename(filename: string): { contractNumber: string | null; responsibleName: string | null } {
   const base = filename.replace(/\.[^.]+$/, "");
@@ -432,10 +449,32 @@ export function ImportContractDocsDialog({ open, onOpenChange, onComplete }: Imp
 
         if (!contractId) throw new Error("Sem contrato vinculado");
 
-        const storagePath = `${user!.id}/${contractId}/${Date.now()}_${fm.file.name}`;
-        const { error: uploadError } = await supabase.storage
+        const safeFilename = buildSafeStorageFilename(fm.file.name);
+        const objectKey = `${Date.now()}_${crypto.randomUUID()}_${safeFilename}`;
+        const storagePath = `${user!.id}/${contractId}/${objectKey}`;
+        const contentType = fm.file.type?.trim() || "application/pdf";
+
+        let { error: uploadError } = await supabase.storage
           .from("contract-documents")
-          .upload(storagePath, fm.file, { contentType: fm.file.type });
+          .upload(storagePath, fm.file, { contentType, upsert: false });
+
+        // Some client/browser combinations send a problematic content type and
+        // Supabase Storage returns 400. Retry once without explicit contentType.
+        if (uploadError) {
+          const maybeStatus =
+            typeof uploadError === "object" &&
+            uploadError !== null &&
+            "statusCode" in uploadError
+              ? (uploadError as { statusCode?: string | number }).statusCode
+              : undefined;
+
+          if (String(maybeStatus) === "400") {
+            const retry = await supabase.storage
+              .from("contract-documents")
+              .upload(storagePath, fm.file, { upsert: false });
+            uploadError = retry.error;
+          }
+        }
 
         if (uploadError) throw uploadError;
 
@@ -476,7 +515,14 @@ export function ImportContractDocsDialog({ open, onOpenChange, onComplete }: Imp
         uploaded++;
       } catch (err: unknown) {
         fm.status = "error";
-        fm.errorMsg = err instanceof Error ? err.message : "Falha no upload";
+        const message =
+          typeof err === "object" &&
+          err !== null &&
+          "message" in err &&
+          typeof (err as { message?: unknown }).message === "string"
+            ? (err as { message: string }).message
+            : "Falha no upload";
+        fm.errorMsg = message;
         errors++;
       }
 
