@@ -46,6 +46,50 @@ const PropertiesList = () => {
     enabled: !!user?.id,
   });
 
+  const { data: tenantNamesByProperty } = useQuery({
+    queryKey: ["property-tenants", user?.id, (properties || []).map((p) => p.id).join(",")],
+    queryFn: async () => {
+      const propertyIds = (properties || []).map((p) => p.id);
+      if (!propertyIds.length) return {} as Record<string, string[]>;
+
+      const { data, error } = await supabase
+        .from("contracts")
+        .select("property_id, tenant_name, status")
+        .in("property_id", propertyIds);
+
+      if (error) throw error;
+
+      const grouped: Record<string, { active: string[]; all: string[] }> = {};
+
+      for (const row of data || []) {
+        if (!row.property_id || !row.tenant_name) continue;
+
+        if (!grouped[row.property_id]) {
+          grouped[row.property_id] = { active: [], all: [] };
+        }
+
+        const target = grouped[row.property_id];
+        if (!target.all.includes(row.tenant_name)) {
+          target.all.push(row.tenant_name);
+        }
+
+        if (row.status === "active" || row.status === "vigente") {
+          if (!target.active.includes(row.tenant_name)) {
+            target.active.push(row.tenant_name);
+          }
+        }
+      }
+
+      const finalMap: Record<string, string[]> = {};
+      for (const [propertyId, names] of Object.entries(grouped)) {
+        finalMap[propertyId] = names.active.length > 0 ? names.active : names.all;
+      }
+
+      return finalMap;
+    },
+    enabled: !!user?.id && !!properties,
+  });
+
   // Check for pending invoices
   const { data: pendingInvoices } = useQuery({
     queryKey: ["pending-invoices", user?.id],
@@ -305,8 +349,8 @@ const PropertiesList = () => {
                         {getStatusBadge(property.status).label}
                       </Badge>
 
-                      {/* Owner Info */}
-                      {property.owner_name && (
+                      {/* Owner + Tenant Info */}
+                      {(property.owner_name || (tenantNamesByProperty?.[property.id]?.length || 0) > 0) && (
                         <div className="flex items-center justify-between pt-2 border-t">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
@@ -314,9 +358,14 @@ const PropertiesList = () => {
                             </div>
                             <div className="flex flex-col">
                               <span className="text-sm font-medium text-gray-700 truncate max-w-[160px]">
-                                {property.owner_name}
+                                {property.owner_name || "Proprietário não informado"}
                               </span>
                               <span className="text-xs text-gray-500">Proprietário</span>
+                              {tenantNamesByProperty?.[property.id]?.length ? (
+                                <span className="text-xs text-gray-500 truncate max-w-[180px]">
+                                  Inquilino(s): {tenantNamesByProperty[property.id].join(", ")}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                           {/* You can add counter badge here if needed */}
