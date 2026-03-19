@@ -16,15 +16,14 @@ export const useSuperAdminCheck = () => {
       }
 
       try {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'super_admin')
-          .maybeSingle();
+        const { data, error } = await supabase.rpc('is_super_admin', {
+          _user_id: user.id,
+        });
 
-        if (error && error.code !== 'PGRST116') {
+        if (error) {
           console.error('Error checking super admin status:', error);
+          setIsSuperAdmin(false);
+          return;
         }
 
         setIsSuperAdmin(!!data);

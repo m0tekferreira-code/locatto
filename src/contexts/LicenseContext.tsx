@@ -58,6 +58,34 @@ export const LicenseProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
+      // Skip function call if local token is already expired.
+      const expiresAtMs = session.expires_at ? session.expires_at * 1000 : null;
+      if (expiresAtMs && expiresAtMs <= Date.now()) {
+        setState({
+          isValid: true,
+          expiresAt: null,
+          loading: false,
+          canEdit: true,
+          daysRemaining: null,
+          isTrial: false,
+        });
+        return;
+      }
+
+      // Confirm the access token is accepted before invoking edge function.
+      const { data: userData, error: tokenError } = await supabase.auth.getUser(session.access_token);
+      if (tokenError || !userData?.user) {
+        setState({
+          isValid: true,
+          expiresAt: null,
+          loading: false,
+          canEdit: true,
+          daysRemaining: null,
+          isTrial: false,
+        });
+        return;
+      }
+
       // In local development we skip remote license verification to avoid
       // blocking login when Edge Functions are not deployed/configured yet.
       if (import.meta.env.DEV) {
