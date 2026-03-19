@@ -546,6 +546,9 @@ const ImportConciliacao = () => {
 
     const totalSteps = contacts.length + contracts.length + invoices.length + (clearBeforeImport ? 1 : 0);
     let completed = 0;
+    const contractIdMap = new Map<string, string>();
+    const propertyIdMap = new Map<string, string>();
+    const contactsByContract = new Map<string, ContactRow[]>();
 
     if (clearBeforeImport) {
       await clearExistingData(activeAccountId);
@@ -673,10 +676,6 @@ const ImportConciliacao = () => {
         setProgress(Math.round((completed / totalSteps) * 100));
       }
     }
-
-    const contractIdMap = new Map<string, string>();
-    const propertyIdMap = new Map<string, string>();
-    const contactsByContract = new Map<string, ContactRow[]>();
 
     for (const contact of contacts) {
       const contractNumber = contact.contractNumber?.trim();
