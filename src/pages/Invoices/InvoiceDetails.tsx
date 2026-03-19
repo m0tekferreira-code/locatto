@@ -32,6 +32,7 @@ const InvoiceDetails = () => {
             tenant_email,
             tenant_phone,
             tenant_document,
+            co_tenants,
             payment_method,
             guarantee_type,
             start_date,
@@ -289,30 +290,65 @@ const InvoiceDetails = () => {
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <User className="h-5 w-5 text-primary" />
-                    <h3 className="font-semibold">Inquilino</h3>
+                    <h3 className="font-semibold">Inquilino(s)</h3>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/50 p-4 rounded-lg">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Nome</p>
-                      <p className="font-medium">{invoice.contracts?.tenant_name}</p>
+                  <div className="space-y-4">
+                    {/* Main Tenant */}
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Inquilino Principal</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Nome</p>
+                          <p className="font-medium">{invoice.contracts?.tenant_name}</p>
+                        </div>
+                        {invoice.contracts?.tenant_email && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Email</p>
+                            <p className="font-medium">{invoice.contracts.tenant_email}</p>
+                          </div>
+                        )}
+                        {invoice.contracts?.tenant_phone && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Telefone</p>
+                            <p className="font-medium">{invoice.contracts.tenant_phone}</p>
+                          </div>
+                        )}
+                        {invoice.contracts?.tenant_document && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Documento</p>
+                            <p className="font-medium">{invoice.contracts.tenant_document}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {invoice.contracts?.tenant_email && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Email</p>
-                        <p className="font-medium">{invoice.contracts.tenant_email}</p>
-                      </div>
-                    )}
-                    {invoice.contracts?.tenant_phone && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Telefone</p>
-                        <p className="font-medium">{invoice.contracts.tenant_phone}</p>
-                      </div>
-                    )}
-                    {invoice.contracts?.tenant_document && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Documento</p>
-                        <p className="font-medium">{invoice.contracts.tenant_document}</p>
-                      </div>
+
+                    {/* Co-Tenants */}
+                    {invoice.contracts?.co_tenants && Array.isArray(invoice.contracts.co_tenants) && invoice.contracts.co_tenants.length > 0 && (
+                      <>
+                        {(invoice.contracts.co_tenants as Array<{ name?: string; document?: string }>).map((coTenant, index) => (
+                          <div key={index} className="bg-muted/50 p-4 rounded-lg">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs bg-secondary/50 text-secondary-foreground px-2 py-0.5 rounded">Co-inquilino</span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {coTenant.name && (
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Nome</p>
+                                  <p className="font-medium">{coTenant.name}</p>
+                                </div>
+                              )}
+                              {coTenant.document && (
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Documento</p>
+                                  <p className="font-medium">{coTenant.document}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </>
                     )}
                   </div>
                 </div>
