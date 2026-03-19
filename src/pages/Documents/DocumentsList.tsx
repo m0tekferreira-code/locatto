@@ -281,7 +281,7 @@ const DocumentsList = () => {
               <TabsContent value="contratos" className="space-y-6 mt-6">
                 {/* Action Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card className="cursor-pointer hover:shadow-lg transition-shadow">
+                  <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate("/contratos/novo")}>
                     <CardHeader>
                       <FileSignature className="h-8 w-8 text-primary mb-2" />
                       <CardTitle className="text-base">Criar novo Contrato ou Acordo</CardTitle>
@@ -291,7 +291,7 @@ const DocumentsList = () => {
                     </CardHeader>
                   </Card>
 
-                  <Card className="cursor-pointer hover:shadow-lg transition-shadow">
+                  <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setImportDocsOpen(true)}>
                     <CardHeader>
                       <FilePlus className="h-8 w-8 text-primary mb-2" />
                       <CardTitle className="text-base">Novo Documento</CardTitle>
@@ -301,7 +301,7 @@ const DocumentsList = () => {
                     </CardHeader>
                   </Card>
 
-                  <Card className="cursor-pointer hover:shadow-lg transition-shadow">
+                  <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setImportDocsOpen(true)}>
                     <CardHeader>
                       <Paperclip className="h-8 w-8 text-primary mb-2" />
                       <CardTitle className="text-base">Anexar documento</CardTitle>
