@@ -36,7 +36,21 @@ const InvoiceDetails = () => {
             payment_method,
             guarantee_type,
             start_date,
-            end_date
+            end_date,
+            properties (
+              id,
+              name,
+              address,
+              number,
+              complement,
+              neighborhood,
+              city,
+              state,
+              postal_code,
+              owner_name,
+              owner_email,
+              owner_contact
+            )
           ),
           properties (
             id,
@@ -57,7 +71,10 @@ const InvoiceDetails = () => {
         .single();
 
       if (error) throw error;
-      return data;
+      
+      // Use property from contract if invoice doesn't have direct property
+      const property = data.properties || data.contracts?.properties;
+      return { ...data, resolvedProperty: property };
     },
     enabled: !!user?.id && !!id,
   });
@@ -252,33 +269,32 @@ const InvoiceDetails = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/50 p-4 rounded-lg">
                     <div>
                       <p className="text-sm text-muted-foreground">Nome</p>
-                      <p className="font-medium">{invoice.properties?.name || "-"}</p>
+                      <p className="font-medium">{invoice.resolvedProperty?.name || "-"}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Endereço</p>
                       <p className="font-medium">
-                        {invoice.properties?.address}, {invoice.properties?.number}
-                        {invoice.properties?.complement && ` - ${invoice.properties.complement}`}
+                        {invoice.resolvedProperty?.address ? `${invoice.resolvedProperty.address}, ${invoice.resolvedProperty.number || ''}${invoice.resolvedProperty.complement ? ` - ${invoice.resolvedProperty.complement}` : ''}` : "-"}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Bairro</p>
-                      <p className="font-medium">{invoice.properties?.neighborhood}</p>
+                      <p className="font-medium">{invoice.resolvedProperty?.neighborhood || "-"}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Cidade</p>
                       <p className="font-medium">
-                        {invoice.properties?.city} - {invoice.properties?.state}
+                        {invoice.resolvedProperty?.city ? `${invoice.resolvedProperty.city} - ${invoice.resolvedProperty.state}` : "-"}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Proprietário</p>
-                      <p className="font-medium">{invoice.properties?.owner_name || "-"}</p>
+                      <p className="font-medium">{invoice.resolvedProperty?.owner_name || "-"}</p>
                     </div>
-                    {invoice.properties?.owner_contact && (
+                    {invoice.resolvedProperty?.owner_contact && (
                       <div>
                         <p className="text-sm text-muted-foreground">Contato do Proprietário</p>
-                        <p className="font-medium">{invoice.properties.owner_contact}</p>
+                        <p className="font-medium">{invoice.resolvedProperty.owner_contact}</p>
                       </div>
                     )}
                   </div>
