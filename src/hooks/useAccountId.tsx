@@ -49,7 +49,6 @@ export const useAccountId = () => {
           // This allows app to work even without the RLS fix applied to database
           // The profile->account linkage can be done later via SQL migration
           setAccountId(ownedAccount.id);
-          console.info('Using account_id from owned account (profile not synced yet)');
         } else {
           setAccountId(null);
         }

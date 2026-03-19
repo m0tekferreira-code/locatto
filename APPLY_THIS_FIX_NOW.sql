@@ -52,6 +52,8 @@ AS $$
   )
 $$;
 
+GRANT EXECUTE ON FUNCTION public.get_user_account_id(uuid) TO authenticated;
+
 -- 3. Backfill: vincular profiles órfãos às contas que eles possuem
 -- (sincroniza dados existentes)
 UPDATE public.profiles p
@@ -59,6 +61,40 @@ SET account_id = a.id
 FROM public.accounts a
 WHERE p.id = a.owner_id
   AND p.account_id IS NULL;
+
+-- 4. Reforçar policies de RLS de properties (corrige 403 no insert de imóveis)
+DROP POLICY IF EXISTS "Users can view their own properties" ON public.properties;
+DROP POLICY IF EXISTS "Users can insert their own properties" ON public.properties;
+DROP POLICY IF EXISTS "Users can update their own properties" ON public.properties;
+DROP POLICY IF EXISTS "Users can delete their own properties" ON public.properties;
+DROP POLICY IF EXISTS "Account members can view properties" ON public.properties;
+DROP POLICY IF EXISTS "Account members can insert properties" ON public.properties;
+DROP POLICY IF EXISTS "Account members can update properties" ON public.properties;
+DROP POLICY IF EXISTS "Account members can delete properties" ON public.properties;
+
+CREATE POLICY "Account members can view properties"
+ON public.properties
+FOR SELECT
+USING (account_id = public.get_user_account_id(auth.uid()));
+
+CREATE POLICY "Account members can insert properties"
+ON public.properties
+FOR INSERT
+WITH CHECK (
+  account_id = public.get_user_account_id(auth.uid())
+  AND auth.uid() = user_id
+);
+
+CREATE POLICY "Account members can update properties"
+ON public.properties
+FOR UPDATE
+USING (account_id = public.get_user_account_id(auth.uid()))
+WITH CHECK (account_id = public.get_user_account_id(auth.uid()));
+
+CREATE POLICY "Account members can delete properties"
+ON public.properties
+FOR DELETE
+USING (account_id = public.get_user_account_id(auth.uid()));
 
 COMMIT;
 

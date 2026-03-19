@@ -73,10 +73,25 @@ export const LicenseProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Call license verification edge function with current token
-      const { data, error } = await supabase.functions.invoke('license-verify');
+      const { data, error } = await supabase.functions.invoke('license-verify', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
       if (error) {
-        console.error('License check error:', error);
+        const status =
+          typeof error === 'object' &&
+          error !== null &&
+          'context' in error &&
+          typeof (error as { context?: unknown }).context === 'object' &&
+          (error as { context?: { status?: number } }).context?.status;
+
+        // Avoid noisy logs/loops when auth is briefly unavailable during refresh.
+        if (status !== 401) {
+          console.error('License check error:', error);
+        }
+
         // Fail-safe: default to valid on transient errors
         setState({
           isValid: true,
