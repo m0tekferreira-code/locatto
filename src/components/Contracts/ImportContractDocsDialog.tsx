@@ -402,8 +402,18 @@ export function ImportContractDocsDialog({ open, onOpenChange, onComplete }: Imp
 
     let uploaded = 0;
     let errors = 0;
+    let shouldAbortRemaining = false;
 
     for (const fm of matchedFiles) {
+      if (shouldAbortRemaining) {
+        fm.status = "error";
+        fm.errorMsg = "Upload interrompido: bucket contract-documents não existe no Supabase";
+        errors++;
+        setProgress(Math.round(((uploaded + errors) / matchedFiles.length) * 100));
+        setFiles([...files]);
+        continue;
+      }
+
       try {
         let contractId = fm.contractId;
 
@@ -459,11 +469,16 @@ export function ImportContractDocsDialog({ open, onOpenChange, onComplete }: Imp
         }
 
         if (uploadError) {
+          const uploadMessage =
+            typeof uploadError === "object" &&
+            uploadError !== null &&
+            "message" in uploadError &&
+            typeof (uploadError as { message?: unknown }).message === "string"
+              ? (uploadError as { message: string }).message
+              : "";
+
           console.error("Storage upload error details", {
-            message:
-              typeof uploadError === "object" && uploadError !== null && "message" in uploadError
-                ? (uploadError as { message?: unknown }).message
-                : undefined,
+            message: uploadMessage,
             name:
               typeof uploadError === "object" && uploadError !== null && "name" in uploadError
                 ? (uploadError as { name?: unknown }).name
@@ -478,6 +493,12 @@ export function ImportContractDocsDialog({ open, onOpenChange, onComplete }: Imp
             fileSize: fm.file.size,
             fileType: fm.file.type,
           });
+
+          if (uploadMessage.toLowerCase().includes("bucket not found")) {
+            shouldAbortRemaining = true;
+            toast.error("Bucket contract-documents não encontrado no Supabase de produção");
+          }
+
           throw uploadError;
         }
 
