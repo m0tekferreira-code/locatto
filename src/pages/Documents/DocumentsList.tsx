@@ -67,6 +67,13 @@ const getTemplateDescription = (template: string): string => {
   return descriptions[template] || "Template de contrato profissional";
 };
 
+const formatSize = (bytes?: number): string => {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
 const DocumentsList = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -75,6 +82,9 @@ const DocumentsList = () => {
   const [typeFilter, setTypeFilter] = useState("all");
   const [importDocsOpen, setImportDocsOpen] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [docSearch, setDocSearch] = useState("");
+  const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
+  const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const handleDeleteContract = async (contractId: string, documents: any[]) => {
@@ -97,6 +107,53 @@ const DocumentsList = () => {
       toast.error("Erro ao excluir: " + err.message);
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleDownloadDoc = async (path: string, name: string) => {
+    setDownloadingDoc(path);
+    try {
+      const { data, error } = await supabase.storage
+        .from("contract-documents")
+        .createSignedUrl(path, 120);
+      if (error || !data?.signedUrl) throw new Error(error?.message || "Erro ao gerar link");
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = name;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err: any) {
+      toast.error("Erro ao baixar: " + err.message);
+    } finally {
+      setDownloadingDoc(null);
+    }
+  };
+
+  const handleDeleteDoc = async (contractId: string, docPath: string) => {
+    if (!confirm("Excluir este documento permanentemente?")) return;
+    setDeletingDoc(docPath);
+    try {
+      await supabase.storage.from("contract-documents").remove([docPath]);
+      const { data: contractData } = await supabase
+        .from("contracts")
+        .select("documents")
+        .eq("id", contractId)
+        .single();
+      const existing = Array.isArray(contractData?.documents) ? (contractData.documents as any[]) : [];
+      const newDocs = existing.filter((d: any) => d.path !== docPath);
+      const { error } = await supabase
+        .from("contracts")
+        .update({ documents: newDocs } as any)
+        .eq("id", contractId);
+      if (error) throw error;
+      toast.success("Documento excluído");
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+    } catch (err: any) {
+      toast.error("Erro ao excluir: " + err.message);
+    } finally {
+      setDeletingDoc(null);
     }
   };
 
@@ -161,6 +218,28 @@ const DocumentsList = () => {
 
   const activeContracts = contracts.filter(c => c.status === "active");
   const closedContracts = contracts.filter(c => c.status !== "active");
+
+  const allDocuments = contracts.flatMap(contract => {
+    const docs = Array.isArray((contract as any).documents) ? (contract as any).documents as any[] : [];
+    return docs.map((doc: any) => ({
+      ...doc,
+      contractId: contract.id,
+      contractNumber: contract.contract_number,
+      tenantName: contract.tenant_name,
+      propertyName: (contract as any).properties?.name,
+    }));
+  });
+
+  const filteredDocs = allDocuments.filter(doc => {
+    if (!docSearch) return true;
+    const term = docSearch.toLowerCase();
+    return (
+      doc.name?.toLowerCase().includes(term) ||
+      String(doc.contractNumber || "").toLowerCase().includes(term) ||
+      doc.tenantName?.toLowerCase().includes(term) ||
+      doc.responsible_contact_name?.toLowerCase().includes(term)
+    );
+  });
 
   const filteredContracts = (list: typeof contracts) => {
     const normalizeContractSearch = (value?: string | null) =>
@@ -480,16 +559,114 @@ const DocumentsList = () => {
 
               <TabsContent value="documentos" className="space-y-6 mt-6">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Documentos</CardTitle>
-                    <CardDescription>
-                      Gerencie documentos relacionados aos seus imóveis
-                    </CardDescription>
+                  <CardHeader className="flex flex-row items-center justify-between gap-4">
+                    <div>
+                      <CardTitle>Documentos</CardTitle>
+                      <CardDescription>
+                        Documentos PDF importados e vinculados aos contratos
+                      </CardDescription>
+                    </div>
+                    <Badge variant="secondary">
+                      {allDocuments.length} arquivo{allDocuments.length !== 1 ? "s" : ""}
+                    </Badge>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-center text-muted-foreground py-8">
-                      Funcionalidade em desenvolvimento
-                    </p>
+                  <CardContent className="space-y-4">
+                    <Input
+                      placeholder="Pesquisar por nome, nº contrato ou responsável..."
+                      value={docSearch}
+                      onChange={(e) => setDocSearch(e.target.value)}
+                      className="max-w-sm"
+                    />
+                    {isLoading ? (
+                      <p className="text-center text-muted-foreground py-8">Carregando...</p>
+                    ) : filteredDocs.length === 0 ? (
+                      <div className="text-center text-muted-foreground py-12">
+                        <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                        <p className="font-medium">
+                          {docSearch
+                            ? "Nenhum documento encontrado para esta busca"
+                            : "Nenhum documento importado ainda"}
+                        </p>
+                        <p className="text-xs mt-1">
+                          Use "Importar PDFs em lote" na aba Contratos para adicionar documentos
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {filteredDocs.map((doc, idx) => (
+                          <Card
+                            key={`${doc.contractId}-${doc.path}-${idx}`}
+                            className="hover:shadow-sm transition-shadow"
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-4">
+                                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                  <FileText className="h-5 w-5 text-primary" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm truncate">{doc.name}</p>
+                                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                                    {doc.contractNumber && (
+                                      <Badge variant="outline" className="text-xs">
+                                        # {doc.contractNumber}
+                                      </Badge>
+                                    )}
+                                    {doc.tenantName && (
+                                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <User className="h-3 w-3" />
+                                        {doc.tenantName}
+                                      </span>
+                                    )}
+                                    {doc.responsible_contact_name &&
+                                      doc.responsible_contact_name !== doc.tenantName && (
+                                        <span className="text-xs text-muted-foreground">
+                                          · {doc.responsible_contact_name}
+                                        </span>
+                                      )}
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                    {doc.uploaded_at && (
+                                      <span className="flex items-center gap-1">
+                                        <Calendar className="h-3 w-3" />
+                                        {new Date(doc.uploaded_at).toLocaleDateString("pt-BR")}
+                                      </span>
+                                    )}
+                                    {doc.size ? <span>{formatSize(doc.size)}</span> : null}
+                                    {doc.propertyName && (
+                                      <span className="flex items-center gap-1">
+                                        <Building2 className="h-3 w-3" />
+                                        {doc.propertyName}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    title="Baixar"
+                                    disabled={downloadingDoc === doc.path}
+                                    onClick={() => handleDownloadDoc(doc.path, doc.name)}
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    title="Excluir"
+                                    className="text-destructive hover:text-destructive"
+                                    disabled={deletingDoc === doc.path}
+                                    onClick={() => handleDeleteDoc(doc.contractId, doc.path)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
