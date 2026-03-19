@@ -4,6 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface HealthCheckStatus {
   profilesInsertPolicy: boolean;
@@ -13,6 +14,7 @@ interface HealthCheckStatus {
 }
 
 export default function RlsFixPage() {
+  const { user } = useAuth();
   const [healthStatus, setHealthStatus] = useState<HealthCheckStatus>({
     profilesInsertPolicy: false,
     getFunctionExists: false,
@@ -21,33 +23,39 @@ export default function RlsFixPage() {
   });
 
   useEffect(() => {
-    checkSystemHealth();
-  }, []);
+    if (user?.id) {
+      checkSystemHealth(user.id);
+    }
+  }, [user?.id]);
 
-  const checkSystemHealth = async () => {
+  const checkSystemHealth = async (userId: string) => {
     try {
       setHealthStatus(prev => ({ ...prev, isChecking: true }));
 
-      // Tentar inserir um profile de teste para verificar a policy
-      const testUserId = crypto.randomUUID();
-      const { error: policyError } = await supabase
+      // Verificar acesso ao próprio profile (evita falso positivo de insert com UUID aleatório)
+      const { data: ownProfile, error: profileError } = await supabase
         .from('profiles')
-        .insert({ id: testUserId, account_id: testUserId })
-        .select()
-        .limit(0);
+        .select('id, account_id')
+        .eq('id', userId)
+        .maybeSingle();
 
-      const profilesInsertPolicy = !policyError || policyError.code !== '42501';
+      const profilesInsertPolicy = !(profileError && profileError.code === '42501');
 
-      // Verificar profiles órfãos
-      const { count: orphanCount } = await supabase
-        .from('profiles')
-        .select('id', { count: 'exact', head: true })
-        .is('account_id', null);
+      // Verificar função get_user_account_id
+      const { data: derivedAccountId, error: functionError } = await supabase.rpc(
+        'get_user_account_id',
+        { _user_id: userId }
+      );
+      const getFunctionExists = !functionError;
+
+      // Verificar se o profile atual está órfão (sem account_id e sem fallback da função)
+      const orphanProfilesCount =
+        ownProfile && !ownProfile.account_id && !derivedAccountId ? 1 : 0;
 
       setHealthStatus({
         profilesInsertPolicy,
-        getFunctionExists: true, // Assume que existe se não houver erro
-        orphanProfilesCount: orphanCount || 0,
+        getFunctionExists,
+        orphanProfilesCount,
         isChecking: false,
       });
     } catch (error) {

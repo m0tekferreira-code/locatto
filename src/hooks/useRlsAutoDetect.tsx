@@ -8,14 +8,12 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
 
 export function useRlsAutoDetect() {
   const [hasRlsIssue, setHasRlsIssue] = useState(false);
   const [hasShownNotification, setHasShownNotification] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -25,51 +23,32 @@ export function useRlsAutoDetect() {
 
     async function detectRlsIssues() {
       try {
-        // Tentar inserir um profile de teste para detectar erro 403
-        const testUserId = crypto.randomUUID();
-        
-        const { error } = await supabase
-          .from('profiles')
-          .insert({ 
-            id: testUserId,
-            account_id: testUserId,
-          })
-          .select()
-          .limit(0);
+        // Diagnóstico robusto: conta dona existe mas função de derivação não retorna conta
+        const { data: ownedAccount } = await supabase
+          .from('accounts')
+          .select('id')
+          .eq('owner_id', user.id)
+          .maybeSingle();
 
-        // Se retornar erro 42501 (RLS violation), temos problema
-        if (error?.code === '42501' && mounted) {
+        if (!ownedAccount || !mounted) {
+          return;
+        }
+
+        const { data: derivedAccountId, error: deriveError } = await supabase.rpc(
+          'get_user_account_id',
+          { _user_id: user.id }
+        );
+
+        if ((!derivedAccountId || deriveError) && mounted) {
           setHasRlsIssue(true);
-          
-          // Verificar se é admin (role não existe na tabela, verificar pela existência de conta)
-          const { data: ownedAccount } = await supabase
-            .from('accounts')
-            .select('id')
-            .eq('owner_id', user.id)
-            .maybeSingle();
 
-          if (ownedAccount && mounted) {
-            // Mostrar toast para admin com ação
-            setHasShownNotification(true);
-            
-            toast({
-              title: "⚠️ Problema de configuração detectado",
-              description: "Políticas RLS precisam ser corrigidas.",
-              duration: 10000,
-            });
-            
-            // Navegar automaticamente após 2 segundos
-            setTimeout(() => {
-              if (window.location.pathname !== '/admin/rls-fix') {
-                navigate('/admin/rls-fix');
-              }
-            }, 2000);
-          } else {
-            // Para usuários normais, apenas log no console
-            console.warn(
-              '⚠️ RLS issue detected. Contact your administrator to run the RLS fix.'
-            );
-          }
+          // Mostrar apenas aviso; não redirecionar automaticamente
+          setHasShownNotification(true);
+          toast({
+            title: "⚠️ Problema de configuração detectado",
+            description: "Conta não vinculada corretamente. Acesse /admin/rls-fix.",
+            duration: 8000,
+          });
         }
       } catch (err) {
         console.error('Error detecting RLS issues:', err);
@@ -85,7 +64,7 @@ export function useRlsAutoDetect() {
       mounted = false;
       clearTimeout(timer);
     };
-  }, [user, hasShownNotification, toast, navigate]);
+  }, [user, hasShownNotification, toast]);
 
   return { hasRlsIssue };
 }
