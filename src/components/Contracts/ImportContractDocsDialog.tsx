@@ -57,23 +57,6 @@ function toDisplayName(slug: string): string {
     .join(" ");
 }
 
-function buildSafeStorageFilename(originalName: string): string {
-  const extMatch = originalName.toLowerCase().match(/\.([a-z0-9]+)$/i);
-  const ext = extMatch ? `.${extMatch[1]}` : ".pdf";
-
-  const base = originalName
-    .replace(/\.[^.]+$/, "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9._-]+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .toLowerCase();
-
-  const trimmedBase = (base || "contrato").slice(0, 90);
-  return `${trimmedBase}${ext}`;
-}
-
 // Ex.: contrato_2494_ricardo_luis_mueller.pdf
 function extractMetadataFromFilename(filename: string): { contractNumber: string | null; responsibleName: string | null } {
   const base = filename.replace(/\.[^.]+$/, "");
@@ -449,8 +432,7 @@ export function ImportContractDocsDialog({ open, onOpenChange, onComplete }: Imp
 
         if (!contractId) throw new Error("Sem contrato vinculado");
 
-        const safeFilename = buildSafeStorageFilename(fm.file.name);
-        const objectKey = `${Date.now()}_${crypto.randomUUID()}_${safeFilename}`;
+        const objectKey = `${Date.now()}_${crypto.randomUUID()}.pdf`;
         const storagePath = `${user!.id}/${contractId}/${objectKey}`;
         const contentType = fm.file.type?.trim() || "application/pdf";
 
@@ -476,7 +458,28 @@ export function ImportContractDocsDialog({ open, onOpenChange, onComplete }: Imp
           }
         }
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error("Storage upload error details", {
+            message:
+              typeof uploadError === "object" && uploadError !== null && "message" in uploadError
+                ? (uploadError as { message?: unknown }).message
+                : undefined,
+            name:
+              typeof uploadError === "object" && uploadError !== null && "name" in uploadError
+                ? (uploadError as { name?: unknown }).name
+                : undefined,
+            statusCode:
+              typeof uploadError === "object" && uploadError !== null && "statusCode" in uploadError
+                ? (uploadError as { statusCode?: unknown }).statusCode
+                : undefined,
+            error: uploadError,
+            storagePath,
+            fileName: fm.file.name,
+            fileSize: fm.file.size,
+            fileType: fm.file.type,
+          });
+          throw uploadError;
+        }
 
         const { data: contractData, error: loadErr } = await supabase
           .from("contracts")
