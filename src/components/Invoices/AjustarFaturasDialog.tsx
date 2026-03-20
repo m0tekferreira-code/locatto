@@ -109,6 +109,14 @@ const formatDate = (iso: string | undefined): string => {
   return `${m[2]}/${m[1]}`; // só mês/ano
 };
 
+// Formata competência YYYY-MM ou YYYY-MM-DD → MM/YYYY
+const formatCompetencia = (s: string | undefined): string => {
+  if (!s) return "";
+  const m = s.match(/^(\d{4})-(\d{2})/);
+  if (m) return `${m[2]}/${m[1]}`;
+  return s;
+};
+
 const statusLabel = (s: string | undefined): string => {
   if (!s) return "";
   if (s === "paid") return "Pago";
@@ -208,7 +216,7 @@ export function AjustarFaturasDialog({ open, onOpenChange }: AjustarFaturasDialo
         const diff = Math.abs((inv.total_amount || 0) - ajuste.valorXlsx);
         ajuste.valorDivergente = diff > 0.01;
 
-        if (inv.reference_month !== ajuste.competencia) ajuste.changes.push("competência");
+        if ((inv.reference_month ?? "").substring(0, 7) !== ajuste.competencia) ajuste.changes.push("competência");
         if (inv.due_date !== ajuste.vencimento) ajuste.changes.push("vencimento");
         if (inv.status !== ajuste.statusXlsx) ajuste.changes.push("status");
       }
@@ -276,7 +284,7 @@ export function AjustarFaturasDialog({ open, onOpenChange }: AjustarFaturasDialo
           const { error } = await supabase
             .from("invoices")
             .update({
-              reference_month: row.competencia,
+              reference_month: row.competencia + "-01",
               due_date: row.vencimento,
               status: row.statusXlsx,
               updated_at: new Date().toISOString(),
@@ -393,12 +401,12 @@ export function AjustarFaturasDialog({ open, onOpenChange }: AjustarFaturasDialo
                       {!row.found && <span className="text-xs text-red-500">Não encontrada</span>}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {row.found && row.competenciaAtual !== row.competencia ? (
+                      {row.found && (row.competenciaAtual ?? "").substring(0, 7) !== row.competencia ? (
                         <span className="text-orange-600">
-                          {formatDate(row.competenciaAtual)} → <strong>{formatDate(row.competencia)}</strong>
+                          {formatCompetencia(row.competenciaAtual)} → <strong>{formatCompetencia(row.competencia)}</strong>
                         </span>
                       ) : (
-                        <span>{formatDate(row.competencia)}</span>
+                        <span>{formatCompetencia(row.competencia)}</span>
                       )}
                     </TableCell>
                     <TableCell className="text-sm">
