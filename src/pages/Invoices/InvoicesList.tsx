@@ -23,9 +23,11 @@ import { ImportInvoiceDetailsDialog } from "@/components/Invoices/ImportInvoiceD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { DateRangePicker, DateFilterField } from "@/components/ui/date-range-picker";
+import { DateRange } from "react-day-picker";
 
 const ITEMS_PER_PAGE = 50;
 
@@ -42,6 +44,8 @@ const InvoicesList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [referenceMonth, setReferenceMonth] = useState<Date>(new Date());
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [dateField, setDateField] = useState<DateFilterField>("due_date");
 
   const filterColumn = accountId ? "account_id" : "user_id";
   const filterValue = accountId || user?.id;
@@ -139,7 +143,38 @@ const InvoicesList = () => {
     const matchesContract = !contractFilter || invoice.contracts?.contract_number?.toLowerCase().includes(contractFilter.toLowerCase());
     const matchesOwner = !ownerFilter || invoice.properties?.owner_name?.toLowerCase().includes(ownerFilter.toLowerCase());
 
-    return matchesSearch && matchesStatus && matchesPaymentMethod && matchesContract && matchesOwner;
+    // Date range filter
+    let matchesDateRange = true;
+    if (dateRange?.from) {
+      let dateToCompare: Date | null = null;
+      
+      if (dateField === "due_date" && invoice.due_date) {
+        dateToCompare = parseISO(invoice.due_date);
+      } else if (dateField === "reference_month" && invoice.reference_month) {
+        // reference_month is YYYY-MM format, compare by month range
+        const [year, month] = invoice.reference_month.split("-").map(Number);
+        const refMonthStart = startOfMonth(new Date(year, month - 1));
+        const refMonthEnd = endOfMonth(new Date(year, month - 1));
+        // Check if reference month overlaps with selected range
+        const rangeEnd = dateRange.to || dateRange.from;
+        matchesDateRange = refMonthStart <= rangeEnd && refMonthEnd >= dateRange.from;
+      } else if (dateField === "payment_date" && invoice.payment_date) {
+        dateToCompare = parseISO(invoice.payment_date);
+      } else if (dateField === "payment_date" && !invoice.payment_date) {
+        // No payment date, exclude from payment_date filter
+        matchesDateRange = false;
+      }
+      
+      if (dateToCompare && dateField !== "reference_month") {
+        const rangeEnd = dateRange.to || dateRange.from;
+        matchesDateRange = isWithinInterval(dateToCompare, {
+          start: dateRange.from,
+          end: rangeEnd,
+        });
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesPaymentMethod && matchesContract && matchesOwner && matchesDateRange;
   });
 
   const paginatedInvoices = filteredInvoices?.slice(
@@ -339,7 +374,14 @@ const InvoicesList = () => {
             </div>
 
             {/* Desktop Filters */}
-            <div className="hidden md:flex flex-col md:flex-row gap-4">
+            <div className="hidden md:flex flex-col md:flex-row gap-4 flex-wrap">
+              <DateRangePicker
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+                dateField={dateField}
+                onDateFieldChange={setDateField}
+              />
+
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full md:w-[180px]">
                   <SelectValue placeholder="Status" />
@@ -385,7 +427,22 @@ const InvoicesList = () => {
               setPaymentMethodFilter("all");
               setContractFilter("");
               setOwnerFilter("");
+              setDateRange(undefined);
             }}>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Filtrar por Data</label>
+                <Select value={dateField} onValueChange={(value) => setDateField(value as DateFilterField)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Tipo de data" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="due_date">Dt. Vencimento</SelectItem>
+                    <SelectItem value="reference_month">Dt. Competência</SelectItem>
+                    <SelectItem value="payment_date">Dt. Pagamento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Status" />
