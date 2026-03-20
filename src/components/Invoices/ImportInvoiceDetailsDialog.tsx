@@ -226,12 +226,14 @@ export function ImportInvoiceDetailsDialog({
   const queryClient = useQueryClient();
   
   const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
+  const [isProcessing, setIsProcessing] = useState(false);
   const [parsedData, setParsedData] = useState<ParsedInvoice[]>([]);
   const [importResults, setImportResults] = useState<{ success: number; failed: number; created: number; updated: number; errors: string[] }>({ success: 0, failed: 0, created: 0, updated: 0, errors: [] });
   const [rawText, setRawText] = useState("");
 
   const resetState = () => {
     setStep("upload");
+    setIsProcessing(false);
     setParsedData([]);
     setImportResults({ success: 0, failed: 0, created: 0, updated: 0, errors: [] });
     setRawText("");
@@ -383,6 +385,21 @@ export function ImportInvoiceDetailsDialog({
     setStep("preview");
   }, []);
 
+  const runProcessData = async (data: string | unknown[][]) => {
+    setIsProcessing(true);
+    try {
+      await processData(data);
+    } catch (err) {
+      toast({
+        title: "Erro ao processar arquivo",
+        description: err instanceof Error ? err.message : "Erro desconhecido ao processar os dados.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   // Mutation para importar
   const importMutation = useMutation({
     mutationFn: async () => {
@@ -524,7 +541,7 @@ export function ImportInvoiceDetailsDialog({
         // Converte para array de arrays
         const jsonData = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1 });
         
-        processData(jsonData);
+        runProcessData(jsonData);
       } catch (err) {
         toast({
           title: "Erro ao ler arquivo",
@@ -538,7 +555,7 @@ export function ImportInvoiceDetailsDialog({
 
   const handlePaste = () => {
     if (rawText.trim()) {
-      processData(rawText);
+      runProcessData(rawText);
     }
   };
 
@@ -593,8 +610,8 @@ export function ImportInvoiceDetailsDialog({
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
                 />
-                <Button onClick={handlePaste} disabled={!rawText.trim()}>
-                  Processar Dados
+                <Button onClick={handlePaste} disabled={!rawText.trim() || isProcessing}>
+                  {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analisando...</> : "Processar Dados"}
                 </Button>
               </div>
               
@@ -607,8 +624,15 @@ export function ImportInvoiceDetailsDialog({
                     type="file"
                     accept=".xlsx,.xls"
                     onChange={handleFileUpload}
+                    disabled={isProcessing}
                     className="max-w-xs"
                   />
+                  {isProcessing && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Analisando arquivo...
+                    </div>
+                  )}
                 </div>
               </div>
 
