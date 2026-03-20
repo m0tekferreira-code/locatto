@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, CheckCircle, XCircle, AlertTriangle, FileSpreadsheet } from "lucide-react";
+import { Upload, CheckCircle, XCircle, AlertTriangle, FileSpreadsheet, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface AjustarFaturasDialogProps {
@@ -129,11 +129,15 @@ export function AjustarFaturasDialog({ open, onOpenChange }: AjustarFaturasDialo
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState("");
   const [rows, setRows] = useState<AjusteRow[]>([]);
   const [results, setResults] = useState({ updated: 0, skipped: 0, errors: [] as string[] });
 
   const reset = () => {
     setStep("upload");
+    setIsProcessing(false);
+    setProcessingMessage("");
     setRows([]);
     setResults({ updated: 0, skipped: 0, errors: [] });
   };
@@ -144,24 +148,45 @@ export function AjustarFaturasDialog({ open, onOpenChange }: AjustarFaturasDialo
   };
 
   const processFile = useCallback(async (rawRows: unknown[][]) => {
-    // rawRows[0] é o header; dados a partir de [1]
+    const CHUNK = 500;
     const dataRows = rawRows.slice(1).filter(r => r.length > 0 && r[0]);
+    if (dataRows.length === 0) { setRows([]); setStep("preview"); return; }
 
+    // Extrai todos os números de fatura únicos
+    const allNumbers = [...new Set(dataRows.map(r => cellToString(r[0])).filter(Boolean))];
+
+    setProcessingMessage(`Consultando ${allNumbers.length} faturas no banco...`);
+
+    // Consulta em lote
+    const foundArr: { id: string; invoice_number: string | null; total_amount: number | null; status: string | null; reference_month: string | null; due_date: string | null }[] = [];
+    for (let i = 0; i < allNumbers.length; i += CHUNK) {
+      const chunk = allNumbers.slice(i, i + CHUNK);
+      const { data: batch } = await supabase
+        .from("invoices")
+        .select("id, invoice_number, total_amount, status, reference_month, due_date")
+        .in("invoice_number", chunk);
+      if (batch) foundArr.push(...batch);
+    }
+    const invoiceMap = new Map(
+      foundArr.filter(inv => inv.invoice_number).map(inv => [inv.invoice_number!, inv])
+    );
+
+    setProcessingMessage(`Processando ${dataRows.length} linhas...`);
+
+    // Monta as linhas localmente (sem mais queries ao banco)
     const parsed: AjusteRow[] = [];
-
     for (const row of dataRows) {
       const faturaNumero = cellToString(row[0]);
-      const contratoNumero = cellToString(row[1]);
+      if (!faturaNumero) continue;
+
       const competenciaRaw = cellToString(row[2]);
       const vencimentoRaw = cellToString(row[3]);
       const valorRaw = row[4];
       const statusRaw = cellToString(row[5]);
 
-      if (!faturaNumero) continue;
-
       const ajuste: AjusteRow = {
         faturaNumero,
-        contratoNumero,
+        contratoNumero: cellToString(row[1]),
         competencia: parseCompetencia(competenciaRaw),
         vencimento: parseVencimento(vencimentoRaw),
         valorXlsx: parseMonetary(typeof valorRaw === "number" ? valorRaw : cellToString(valorRaw)),
@@ -171,26 +196,18 @@ export function AjustarFaturasDialog({ open, onOpenChange }: AjustarFaturasDialo
         changes: [],
       };
 
-      // Busca fatura no banco
-      const { data: inv } = await supabase
-        .from("invoices")
-        .select("id, invoice_number, total_amount, status, reference_month, due_date")
-        .eq("invoice_number", faturaNumero)
-        .maybeSingle();
-
+      const inv = invoiceMap.get(faturaNumero);
       if (inv) {
         ajuste.found = true;
         ajuste.invoiceId = inv.id;
-        ajuste.valorAtual = inv.total_amount;
-        ajuste.statusAtual = inv.status;
-        ajuste.competenciaAtual = inv.reference_month;
-        ajuste.vencimentoAtual = inv.due_date;
+        ajuste.valorAtual = inv.total_amount ?? undefined;
+        ajuste.statusAtual = inv.status ?? undefined;
+        ajuste.competenciaAtual = inv.reference_month ?? undefined;
+        ajuste.vencimentoAtual = inv.due_date ?? undefined;
 
-        // Verifica divergências de valor
         const diff = Math.abs((inv.total_amount || 0) - ajuste.valorXlsx);
         ajuste.valorDivergente = diff > 0.01;
 
-        // Lista o que vai mudar
         if (inv.reference_month !== ajuste.competencia) ajuste.changes.push("competência");
         if (inv.due_date !== ajuste.vencimento) ajuste.changes.push("vencimento");
         if (inv.status !== ajuste.statusXlsx) ajuste.changes.push("status");
@@ -207,6 +224,9 @@ export function AjustarFaturasDialog({ open, onOpenChange }: AjustarFaturasDialo
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIsProcessing(true);
+    setProcessingMessage("Lendo arquivo...");
+
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
@@ -214,10 +234,24 @@ export function AjustarFaturasDialog({ open, onOpenChange }: AjustarFaturasDialo
         const wb = XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
-        processFile(jsonData);
+        processFile(jsonData)
+          .catch(err => {
+            toast({ title: "Erro ao processar arquivo", description: err instanceof Error ? err.message : "Erro desconhecido", variant: "destructive" });
+          })
+          .finally(() => {
+            setIsProcessing(false);
+            setProcessingMessage("");
+          });
       } catch {
+        setIsProcessing(false);
+        setProcessingMessage("");
         toast({ title: "Erro ao ler arquivo", description: "Verifique se é um .xlsx válido.", variant: "destructive" });
       }
+    };
+    reader.onerror = () => {
+      setIsProcessing(false);
+      setProcessingMessage("");
+      toast({ title: "Erro ao ler arquivo", description: "Falha ao carregar o arquivo.", variant: "destructive" });
     };
     reader.readAsArrayBuffer(file);
   };
@@ -286,22 +320,31 @@ export function AjustarFaturasDialog({ open, onOpenChange }: AjustarFaturasDialo
         {/* STEP: Upload */}
         {step === "upload" && (
           <div className="flex flex-col items-center justify-center gap-4 py-12 border-2 border-dashed rounded-lg">
-            <FileSpreadsheet className="h-12 w-12 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Selecione o arquivo Excel (.xlsx)</p>
-            <label>
-              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileUpload} />
-              <Button variant="outline" asChild>
-                <span className="cursor-pointer">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Selecionar arquivo
-                </span>
-              </Button>
-            </label>
-            <div className="mt-4 text-xs text-muted-foreground space-y-1 text-center">
-              <p>Exemplo de estrutura esperada:</p>
-              <p className="font-mono">Fatura | Contrato | Competencia | Vencimento | Valor | Status</p>
-              <p className="font-mono">219117 | 10598 | 03-2026 | 06/03/2026 | R$ 1.357,80 | Pago</p>
-            </div>
+            {isProcessing ? (
+              <>
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">{processingMessage || "Processando..."}</p>
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="h-12 w-12 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Selecione o arquivo Excel (.xlsx)</p>
+                <label>
+                  <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileUpload} disabled={isProcessing} />
+                  <Button variant="outline" asChild>
+                    <span className="cursor-pointer">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Selecionar arquivo
+                    </span>
+                  </Button>
+                </label>
+                <div className="mt-4 text-xs text-muted-foreground space-y-1 text-center">
+                  <p>Exemplo de estrutura esperada:</p>
+                  <p className="font-mono">Fatura | Contrato | Competencia | Vencimento | Valor | Status</p>
+                  <p className="font-mono">219117 | 10598 | 03-2026 | 06/03/2026 | R$ 1.357,80 | Pago</p>
+                </div>
+              </>
+            )}
           </div>
         )}
 

@@ -227,6 +227,7 @@ export function ImportInvoiceDetailsDialog({
   
   const [step, setStep] = useState<"upload" | "preview" | "importing" | "done">("upload");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState("");
   const [parsedData, setParsedData] = useState<ParsedInvoice[]>([]);
   const [importResults, setImportResults] = useState<{ success: number; failed: number; created: number; updated: number; errors: string[] }>({ success: 0, failed: 0, created: 0, updated: 0, errors: [] });
   const [rawText, setRawText] = useState("");
@@ -234,6 +235,7 @@ export function ImportInvoiceDetailsDialog({
   const resetState = () => {
     setStep("upload");
     setIsProcessing(false);
+    setProcessingMessage("");
     setParsedData([]);
     setImportResults({ success: 0, failed: 0, created: 0, updated: 0, errors: [] });
     setRawText("");
@@ -245,28 +247,76 @@ export function ImportInvoiceDetailsDialog({
   };
 
   // Processa os dados (aceita texto ou array de arrays do XLSX)
+  // Usa consultas em LOTE para evitar N+1 queries
   const processData = useCallback(async (data: string | unknown[][]) => {
+    const CHUNK = 500; // Supabase suporta .in() com muitos itens, mas dividimos por segurança
+
     let rows: string[][];
-    
     if (typeof data === "string") {
       rows = parseText(data);
     } else {
-      // Converte array do XLSX para strings
       rows = data.map(row => row.map(cell => cellToString(cell)));
     }
-    
-    // Pula o cabeçalho
+
     const dataRows = rows.slice(1).filter(row => row.length > 0 && row[0]);
-    
+    if (dataRows.length === 0) {
+      setParsedData([]);
+      setStep("preview");
+      return;
+    }
+
+    // ── FASE 1: Coleta todos os números únicos ──────────────────────────
+    const allInvoiceNumbers = [...new Set(dataRows.map(row => row[0]?.trim()).filter(Boolean))];
+
+    setProcessingMessage(`Consultando ${allInvoiceNumbers.length} faturas no banco...`);
+
+    // ── FASE 2: Uma única consulta em lote para faturas ─────────────────
+    const foundInvoicesArr: { id: string; invoice_number: string | null }[] = [];
+    for (let i = 0; i < allInvoiceNumbers.length; i += CHUNK) {
+      const chunk = allInvoiceNumbers.slice(i, i + CHUNK);
+      const { data: batch } = await supabase
+        .from("invoices")
+        .select("id, invoice_number")
+        .in("invoice_number", chunk);
+      if (batch) foundInvoicesArr.push(...batch);
+    }
+    const invoiceMap = new Map(
+      foundInvoicesArr.filter(inv => inv.invoice_number).map(inv => [inv.invoice_number!, inv])
+    );
+
+    // ── FASE 3: Uma única consulta em lote para contratos (só os não encontrados) ──
+    const foundInvoiceNumbers = new Set(invoiceMap.keys());
+    const contractNumbersNeeded = [...new Set(
+      dataRows
+        .filter(row => !foundInvoiceNumbers.has(row[0]?.trim()))
+        .map(row => row[2]?.trim())
+        .filter(Boolean)
+    )];
+
+    const contractMap = new Map<string, { id: string; property_id: string | null; account_id: string | null; user_id: string | null }>();
+    if (contractNumbersNeeded.length > 0) {
+      setProcessingMessage(`Consultando ${contractNumbersNeeded.length} contratos no banco...`);
+      for (let i = 0; i < contractNumbersNeeded.length; i += CHUNK) {
+        const chunk = contractNumbersNeeded.slice(i, i + CHUNK);
+        const { data: batch } = await supabase
+          .from("contracts")
+          .select("id, contract_number, property_id, account_id, user_id")
+          .in("contract_number", chunk)
+          .eq("status", "active");
+        if (batch) batch.forEach(c => contractMap.set(c.contract_number, c));
+      }
+    }
+
+    // ── FASE 4: Processa todas as linhas localmente (sem mais queries) ──
+    setProcessingMessage(`Processando ${dataRows.length} linhas...`);
     const parsed: ParsedInvoice[] = [];
-    
+
     for (const row of dataRows) {
       const invoiceNumber = row[0]?.trim();
       const clientName = row[1]?.trim() || "";
       const contractNumber = row[2]?.trim() || "";
       const competencia = row[3]?.trim() || "";
-      
-      // Inicializa valores
+
       const invoice: ParsedInvoice = {
         invoiceNumber,
         clientName,
@@ -289,26 +339,24 @@ export function ImportInvoiceDetailsDialog({
         found: false,
         contractFound: false,
       };
-      
+
       // Processa itens (pares de descrição/valor começando na coluna 4)
       let colIndex = 4;
-      while (colIndex < row.length - 1) { // -1 porque última coluna é Total
+      while (colIndex < row.length - 1) {
         const description = row[colIndex]?.trim();
         const valueStr = row[colIndex + 1]?.trim();
-        
+
         if (description && valueStr) {
           const value = parseValue(valueStr);
           const fieldInfo = identifyField(description);
-          
-          const item: ParsedInvoiceItem = {
+
+          invoice.items.push({
             description,
             value,
             mappedField: fieldInfo.field,
             installmentInfo: fieldInfo.installmentNumber?.toString(),
-          };
-          invoice.items.push(item);
-          
-          // Mapeia para o campo correto
+          });
+
           if (fieldInfo.field === "rental_amount") {
             invoice.rental_amount = value;
           } else if (fieldInfo.field === "water_amount") {
@@ -324,13 +372,12 @@ export function ImportInvoiceDetailsDialog({
           } else if (fieldInfo.field === "condo_fee") {
             invoice.condo_fee = value;
           } else if (fieldInfo.field === "discount") {
-            invoice.discount = Math.abs(value); // Desconto sempre positivo
+            invoice.discount = Math.abs(value);
             invoice.discount_description = "Importado";
           } else if (fieldInfo.field === "guarantee_installment") {
             invoice.guarantee_installment = value;
             invoice.guarantee_installment_number = fieldInfo.installmentNumber || null;
           } else if (fieldInfo.field === null && value !== 0) {
-            // Extra charge
             invoice.extra_charges.push({
               id: `extra-${Date.now()}-${colIndex}`,
               description,
@@ -338,55 +385,38 @@ export function ImportInvoiceDetailsDialog({
             });
           }
         }
-        
-        colIndex += 2; // Próximo par descrição/valor
+        colIndex += 2;
       }
-      
+
       // Total da última coluna
-      const totalStr = row[row.length - 1]?.trim();
-      invoice.total = parseValue(totalStr);
-      
-      // Busca a fatura no banco
-      if (invoiceNumber) {
-        const { data } = await supabase
-          .from("invoices")
-          .select("id, invoice_number")
-          .eq("invoice_number", invoiceNumber)
-          .maybeSingle();
-        
-        if (data) {
-          invoice.found = true;
-          invoice.invoiceId = data.id;
-        }
-      }
-      
-      // Se a fatura não foi encontrada, busca o contrato pelo número
-      if (!invoice.found && contractNumber) {
-        const { data: contractData } = await supabase
-          .from("contracts")
-          .select("id, property_id, account_id, user_id")
-          .eq("contract_number", contractNumber)
-          .eq("status", "active")
-          .maybeSingle();
-        
-        if (contractData) {
+      invoice.total = parseValue(row[row.length - 1]?.trim());
+
+      // Usa os mapas (sem queries adicionais)
+      const foundInvoice = invoiceMap.get(invoiceNumber);
+      if (foundInvoice) {
+        invoice.found = true;
+        invoice.invoiceId = foundInvoice.id;
+      } else {
+        const foundContract = contractMap.get(contractNumber);
+        if (foundContract) {
           invoice.contractFound = true;
-          invoice.contractId = contractData.id;
-          invoice.propertyId = contractData.property_id;
-          invoice.accountId = contractData.account_id;
-          invoice.userId = contractData.user_id;
+          invoice.contractId = foundContract.id;
+          invoice.propertyId = foundContract.property_id ?? undefined;
+          invoice.accountId = foundContract.account_id ?? undefined;
+          invoice.userId = foundContract.user_id ?? undefined;
         }
       }
-      
+
       parsed.push(invoice);
     }
-    
+
     setParsedData(parsed);
     setStep("preview");
   }, []);
 
   const runProcessData = async (data: string | unknown[][]) => {
     setIsProcessing(true);
+    setProcessingMessage("Lendo dados...");
     try {
       await processData(data);
     } catch (err) {
@@ -527,7 +557,11 @@ export function ImportInvoiceDetailsDialog({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
+    // Mostra spinner imediatamente, antes de qualquer processamento
+    setIsProcessing(true);
+    setProcessingMessage("Lendo arquivo...");
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -543,12 +577,19 @@ export function ImportInvoiceDetailsDialog({
         
         runProcessData(jsonData);
       } catch (err) {
+        setIsProcessing(false);
+        setProcessingMessage("");
         toast({
           title: "Erro ao ler arquivo",
           description: "Não foi possível ler o arquivo Excel. Verifique se é um arquivo .xlsx válido.",
           variant: "destructive",
         });
       }
+    };
+    reader.onerror = () => {
+      setIsProcessing(false);
+      setProcessingMessage("");
+      toast({ title: "Erro ao ler arquivo", description: "Falha ao carregar o arquivo.", variant: "destructive" });
     };
     reader.readAsArrayBuffer(file);
   };
@@ -630,7 +671,7 @@ export function ImportInvoiceDetailsDialog({
                   {isProcessing && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Analisando arquivo...
+                      {processingMessage || "Analisando arquivo..."}
                     </div>
                   )}
                 </div>
