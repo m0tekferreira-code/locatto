@@ -473,12 +473,19 @@ const ReportsList = () => {
                             )
                           );
                           const tenantName = invoice.contracts?.tenant_name ?? "—";
+                          // Resolve property name: direct relation or look up via contract's property_id
+                          const contractPropertyId = invoice.contracts?.property_id;
+                          const propertyName =
+                            invoice.properties?.name ??
+                            (contractPropertyId
+                              ? properties?.find(p => p.id === contractPropertyId)?.name
+                              : undefined) ??
+                            "—";
 
                           return (
                             <TableRow key={invoice.id}>
-                              <TableCell className="font-medium">
-                                {invoice.properties?.name}
-                              </TableCell>
+                              <TableCell className="font-medium">{propertyName}</TableCell>
+                              <TableCell>{tenantName}</TableCell>
                               <TableCell>
                                 {new Date(invoice.due_date).toLocaleDateString("pt-BR")}
                               </TableCell>
@@ -488,7 +495,6 @@ const ReportsList = () => {
                               <TableCell>
                                 <Badge variant="destructive">{daysOverdue} dias</Badge>
                               </TableCell>
-                              <TableCell>{tenantName}</TableCell>
                               <TableCell>
                                 <Badge variant={getStatusVariant(invoice.status)}>
                                   {getStatusLabel(invoice.status)}
