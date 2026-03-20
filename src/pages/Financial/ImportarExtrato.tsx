@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Upload, Loader2, AlertTriangle, FileSpreadsheet, DollarSign, AlertCircle, UserX, FileDown } from "lucide-react";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import { TenantAssignSelect } from "@/components/Extrato/TenantAssignSelect";
 import type { StatusBaixa } from "@/lib/parseExtrato";
 
@@ -52,7 +52,7 @@ const ImportarExtrato = () => {
     doc.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, 14, 28);
     doc.text(`Total: ${naoIdentificados.length} registro(s)`, 14, 34);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 42,
       head: [["Data", "Nome Extrato", "Valor", "Status", "Observação"]],
       body: naoIdentificados.map((l) => [

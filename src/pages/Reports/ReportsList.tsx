@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { AppLayout } from "@/components/Layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -314,7 +314,7 @@ const ReportsList = () => {
     doc.text(title, 14, 20);
     doc.setFontSize(10);
     doc.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, 14, 28);
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 34,
       head: [head],
       body: rows,
