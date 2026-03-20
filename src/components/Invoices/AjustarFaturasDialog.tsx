@@ -92,9 +92,12 @@ const parseCompetencia = (raw: string): string => {
 // Converte vencimento "06/03/2026" → "2026-03-06"
 const parseVencimento = (raw: string): string => {
   const str = raw.trim();
-  // dd/MM/yyyy
+  // dd/MM/yyyy (com barras)
   const m1 = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (m1) return `${m1[3]}-${m1[2]}-${m1[1]}`;
+  // dd-MM-yyyy (com hífens — usuário salvou assim para evitar conversão Excel)
+  const m2 = str.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
   // yyyy-MM-dd já correto
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
   return str;
