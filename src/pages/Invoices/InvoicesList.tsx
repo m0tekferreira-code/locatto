@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Receipt, Eye, DollarSign, AlertCircle, Zap, Calendar as CalendarIcon, FileSpreadsheet } from "lucide-react";
+import { Plus, Search, Receipt, DollarSign, AlertCircle, Zap, Calendar as CalendarIcon, FileSpreadsheet, Mail, MessageCircle, Copy, ChevronLeft, ChevronRight } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { InvoiceCard } from "@/components/Responsive/InvoiceCard";
 import { FilterDrawer } from "@/components/Filters/FilterDrawer";
@@ -16,7 +17,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { toast } from "@/hooks/use-toast";
 import { GenerateInvoiceDialog } from "@/components/Invoices/GenerateInvoiceDialog";
 import { ImportInvoiceDetailsDialog } from "@/components/Invoices/ImportInvoiceDetailsDialog";
@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 import { DateRangePicker, DateFilterField } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 
-const ITEMS_PER_PAGE = 50;
+const ITEMS_PER_PAGE_OPTIONS = [50, 100, 200];
 
 const InvoicesList = () => {
   const { user } = useAuth();
@@ -46,6 +46,8 @@ const InvoicesList = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [dateField, setDateField] = useState<DateFilterField>("due_date");
+  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+  const [itemsPerPage, setItemsPerPage] = useState(100);
 
   const filterColumn = accountId ? "account_id" : "user_id";
   const filterValue = accountId || user?.id;
@@ -177,12 +179,53 @@ const InvoicesList = () => {
     return matchesSearch && matchesStatus && matchesPaymentMethod && matchesContract && matchesOwner && matchesDateRange;
   });
 
+  // Status counts (before status filter)
+  const statusCounts = invoices?.reduce((acc, invoice) => {
+    // Apply all filters except status
+    const matchesSearch =
+      invoice.contracts?.tenant_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.properties?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.properties?.owner_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.contracts?.contract_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesPaymentMethod = paymentMethodFilter === "all" || invoice.payment_method === paymentMethodFilter;
+    const matchesContract = !contractFilter || invoice.contracts?.contract_number?.toLowerCase().includes(contractFilter.toLowerCase());
+    const matchesOwner = !ownerFilter || invoice.properties?.owner_name?.toLowerCase().includes(ownerFilter.toLowerCase());
+    
+    if (matchesSearch && matchesPaymentMethod && matchesContract && matchesOwner) {
+      acc[invoice.status] = (acc[invoice.status] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>) || {};
+
   const paginatedInvoices = filteredInvoices?.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
-  const totalPages = Math.ceil((filteredInvoices?.length || 0) / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil((filteredInvoices?.length || 0) / itemsPerPage);
+
+  // Total of filtered invoices
+  const filteredTotal = filteredInvoices?.reduce((sum, inv) => sum + Number(inv.total_amount), 0) || 0;
+
+  // Selection handlers
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedInvoices(paginatedInvoices?.map(inv => inv.id) || []);
+    } else {
+      setSelectedInvoices([]);
+    }
+  };
+
+  const handleSelectInvoice = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedInvoices(prev => [...prev, id]);
+    } else {
+      setSelectedInvoices(prev => prev.filter(i => i !== id));
+    }
+  };
+
+  const isAllSelected = paginatedInvoices?.length > 0 && paginatedInvoices?.every(inv => selectedInvoices.includes(inv.id));
 
   const getStatusBadge = (status: string, dueDate: string) => {
     const variants = {
@@ -190,6 +233,7 @@ const InvoicesList = () => {
       pending: { variant: "secondary" as const, label: "Pendente", icon: null },
       overdue: { variant: "destructive" as const, label: "Vencida", icon: AlertCircle },
       cancelled: { variant: "outline" as const, label: "Cancelada", icon: null },
+      judicial: { variant: "destructive" as const, label: "Cobrança Judicial", icon: null },
     };
 
     const config = variants[status as keyof typeof variants] || variants.pending;
@@ -382,18 +426,6 @@ const InvoicesList = () => {
                 onDateFieldChange={setDateField}
               />
 
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-[180px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="paid">Pago</SelectItem>
-                  <SelectItem value="cancelled">Cancelada</SelectItem>
-                </SelectContent>
-              </Select>
-
               <Select value={paymentMethodFilter} onValueChange={setPaymentMethodFilter}>
                 <SelectTrigger className="w-full md:w-[200px]">
                   <SelectValue placeholder="Forma de Pagamento" />
@@ -443,18 +475,6 @@ const InvoicesList = () => {
                 </Select>
               </div>
 
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="paid">Pago</SelectItem>
-                  <SelectItem value="cancelled">Cancelada</SelectItem>
-                </SelectContent>
-              </Select>
-
               <Select value={paymentMethodFilter} onValueChange={setPaymentMethodFilter}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Forma de Pagamento" />
@@ -491,8 +511,59 @@ const InvoicesList = () => {
                 <p className="mt-4 text-muted-foreground">Carregando faturas...</p>
               </div>
             </div>
-          ) : filteredInvoices && filteredInvoices.length > 0 ? (
+          ) : invoices && invoices.length > 0 ? (
             <>
+              {/* Status Tabs */}
+              <div className="flex items-center gap-4 mb-4 border-b">
+                <button
+                  onClick={() => setStatusFilter("paid")}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                    statusFilter === "paid" 
+                      ? "border-primary text-primary" 
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Pago
+                  <Badge variant="secondary" className="ml-1 bg-primary/10 text-primary">
+                    {statusCounts.paid || 0}
+                  </Badge>
+                </button>
+                <button
+                  onClick={() => setStatusFilter("pending")}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                    statusFilter === "pending" 
+                      ? "border-primary text-primary" 
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Pendente
+                </button>
+                <button
+                  onClick={() => setStatusFilter("cancelled")}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                    statusFilter === "cancelled" 
+                      ? "border-primary text-primary" 
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Cancelado
+                </button>
+                <button
+                  onClick={() => setStatusFilter("judicial")}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                    statusFilter === "judicial" 
+                      ? "border-primary text-primary" 
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Cobrança Judicial
+                </button>
+              </div>
+
               {/* Mobile: Cards */}
               <div className="md:hidden grid gap-4">
                 {paginatedInvoices?.map((invoice) => (
@@ -510,22 +581,66 @@ const InvoicesList = () => {
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="w-[50px]">
+                            <Checkbox 
+                              checked={isAllSelected}
+                              onCheckedChange={handleSelectAll}
+                            />
+                          </TableHead>
+                          <TableHead className="w-[80px]"></TableHead>
                           <TableHead>Cliente</TableHead>
                           <TableHead>Proprietário</TableHead>
                           <TableHead>Contrato</TableHead>
-                          <TableHead>Imóvel</TableHead>
+                          <TableHead className="text-right">Valor Total</TableHead>
                           <TableHead>Competência</TableHead>
                           <TableHead>Vencimento</TableHead>
-                          <TableHead>Valor</TableHead>
-                          <TableHead>Pagamento</TableHead>
+                          <TableHead>Forma de Pagamento</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead className="w-[80px]"></TableHead>
+                          <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {paginatedInvoices?.map((invoice) => (
-                          <TableRow key={invoice.id}>
+                          <TableRow 
+                            key={invoice.id}
+                            className={cn(
+                              selectedInvoices.includes(invoice.id) && "bg-muted/50"
+                            )}
+                          >
+                            <TableCell>
+                              <Checkbox 
+                                checked={selectedInvoices.includes(invoice.id)}
+                                onCheckedChange={(checked) => handleSelectInvoice(invoice.id, !!checked)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                {invoice.contracts?.tenant_email && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                    onClick={() => window.location.href = `mailto:${invoice.contracts?.tenant_email}`}
+                                  >
+                                    <Mail className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {invoice.contracts?.tenant_phone && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-green-500"
+                                    onClick={() => {
+                                      const phone = invoice.contracts?.tenant_phone?.replace(/\D/g, '');
+                                      window.open(`https://wa.me/55${phone}`, '_blank');
+                                    }}
+                                  >
+                                    <MessageCircle className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className="font-medium">
                               {invoice.contracts?.tenant_name || "-"}
                             </TableCell>
@@ -533,22 +648,21 @@ const InvoicesList = () => {
                               {invoice.properties?.owner_name || "-"}
                             </TableCell>
                             <TableCell>
-                              {invoice.contracts?.contract_number || "-"}
+                              <span className="text-primary">
+                                Contrato #{invoice.contracts?.contract_number || "-"}
+                              </span>
                             </TableCell>
-                            <TableCell className="max-w-xs truncate">
-                              {invoice.properties?.name || invoice.properties?.address}
+                            <TableCell className="text-right font-medium">
+                              R$ {Number(invoice.total_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                             </TableCell>
                             <TableCell>
-                              {format(new Date(invoice.reference_month), "MMM/yyyy", { locale: ptBR })}
+                              {format(new Date(invoice.reference_month), "MM/yyyy")}
                             </TableCell>
                             <TableCell>
                               {format(new Date(invoice.due_date), "dd/MM/yyyy")}
                             </TableCell>
-                            <TableCell className="font-semibold">
-                              R$ {Number(invoice.total_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {invoice.payment_method === "bank_transfer" ? "Transferência" : 
+                            <TableCell>
+                              {invoice.payment_method === "bank_transfer" ? "Transferência Bancária" : 
                                invoice.payment_method === "pix" ? "PIX" :
                                invoice.payment_method === "boleto" ? "Boleto" :
                                invoice.payment_method || "-"}
@@ -558,8 +672,8 @@ const InvoicesList = () => {
                             </TableCell>
                             <TableCell>
                               <Link to={`/faturas/${invoice.id}`}>
-                                <Button variant="ghost" size="icon">
-                                  <Eye className="h-4 w-4" />
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <Copy className="h-4 w-4" />
                                 </Button>
                               </Link>
                             </TableCell>
@@ -568,63 +682,84 @@ const InvoicesList = () => {
                       </TableBody>
                     </Table>
                   </div>
+                  
+                  {/* Table Footer with Total */}
+                  <div className="border-t px-6 py-3 flex justify-end">
+                    <span className="text-sm text-muted-foreground">
+                      Total das faturas exibidas:{" "}
+                      <span className="font-semibold text-foreground">
+                        R$ {filteredTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </span>
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
 
-              {totalPages > 1 && (
-                <div className="mt-6">
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious 
-                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                          className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1)
-                        .filter(page => {
-                          const distance = Math.abs(page - currentPage);
-                          return distance === 0 || distance === 1 || page === 1 || page === totalPages;
-                        })
-                        .map((page, idx, arr) => {
-                          if (idx > 0 && arr[idx - 1] !== page - 1) {
-                            return [
-                              <PaginationItem key={`ellipsis-${page}`}>
-                                <span className="px-4">...</span>
-                              </PaginationItem>,
-                              <PaginationItem key={page}>
-                                <PaginationLink
-                                  onClick={() => setCurrentPage(page)}
-                                  isActive={currentPage === page}
-                                  className="cursor-pointer"
-                                >
-                                  {page}
-                                </PaginationLink>
-                              </PaginationItem>
-                            ];
-                          }
-                          return (
-                            <PaginationItem key={page}>
-                              <PaginationLink
-                                onClick={() => setCurrentPage(page)}
-                                isActive={currentPage === page}
-                                className="cursor-pointer"
-                              >
-                                {page}
-                              </PaginationLink>
-                            </PaginationItem>
-                          );
-                        })}
-                      <PaginationItem>
-                        <PaginationNext 
-                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                          className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
+              {/* Pagination */}
+              <div className="mt-4 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Por página:</span>
+                  <Select value={itemsPerPage.toString()} onValueChange={(v) => { setItemsPerPage(Number(v)); setCurrentPage(1); }}>
+                    <SelectTrigger className="w-[70px] h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ITEMS_PER_PAGE_OPTIONS.map(opt => (
+                        <SelectItem key={opt} value={opt.toString()}>{opt}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span>{filteredInvoices?.length || 0} registros encontrados.</span>
                 </div>
-              )}
+                
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => {
+                        const distance = Math.abs(page - currentPage);
+                        return distance === 0 || distance === 1 || page === 1 || page === totalPages;
+                      })
+                      .map((page, idx, arr) => {
+                        const items = [];
+                        if (idx > 0 && arr[idx - 1] !== page - 1) {
+                          items.push(
+                            <span key={`ellipsis-${page}`} className="px-2 text-muted-foreground">...</span>
+                          );
+                        }
+                        items.push(
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setCurrentPage(page)}
+                          >
+                            {page}
+                          </Button>
+                        );
+                        return items;
+                      })}
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <Card>
