@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Receipt, Eye, DollarSign, AlertCircle, Zap, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Search, Receipt, Eye, DollarSign, AlertCircle, Zap, Calendar as CalendarIcon, FileSpreadsheet } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { InvoiceCard } from "@/components/Responsive/InvoiceCard";
 import { FilterDrawer } from "@/components/Filters/FilterDrawer";
@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { toast } from "@/hooks/use-toast";
 import { GenerateInvoiceDialog } from "@/components/Invoices/GenerateInvoiceDialog";
+import { ImportInvoiceDetailsDialog } from "@/components/Invoices/ImportInvoiceDetailsDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -40,6 +41,7 @@ const InvoicesList = () => {
   const [ownerFilter, setOwnerFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [referenceMonth, setReferenceMonth] = useState<Date>(new Date());
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const filterColumn = accountId ? "account_id" : "user_id";
   const filterValue = accountId || user?.id;
@@ -323,6 +325,11 @@ const InvoicesList = () => {
 
               <GenerateInvoiceDialog />
 
+              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Importar Detalhes
+              </Button>
+
               <Link to="/faturas/nova">
                 <Button className="w-full md:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
@@ -581,6 +588,12 @@ const InvoicesList = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* Import Dialog */}
+          <ImportInvoiceDetailsDialog
+            open={importDialogOpen}
+            onOpenChange={setImportDialogOpen}
+          />
     </AppLayout>
   );
 };
