@@ -558,6 +558,7 @@ const ReportsList = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Imóvel</TableHead>
+                        <TableHead>Inquilino</TableHead>
                         <TableHead>Referência</TableHead>
                         <TableHead>Vencimento</TableHead>
                         <TableHead>Valor</TableHead>
@@ -565,30 +566,40 @@ const ReportsList = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredInvoices.map((invoice) => (
-                        <TableRow key={invoice.id}>
-                          <TableCell className="font-medium">
-                            {invoice.properties?.name}
-                          </TableCell>
-                          <TableCell>
-                            {new Date(invoice.reference_month).toLocaleDateString("pt-BR", {
-                              month: "2-digit",
-                              year: "numeric"
-                            })}
-                          </TableCell>
-                          <TableCell>
-                            {new Date(invoice.due_date).toLocaleDateString("pt-BR")}
-                          </TableCell>
-                          <TableCell>
-                            R$ {Number(invoice.total_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getStatusVariant(invoice.status)}>
-                              {getStatusLabel(invoice.status)}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {filteredInvoices.map((invoice) => {
+                        const contractPropertyId = invoice.contracts?.property_id;
+                        const propertyName =
+                          invoice.properties?.name ??
+                          (contractPropertyId
+                            ? properties?.find(p => p.id === contractPropertyId)?.name
+                            : undefined) ??
+                          "—";
+                        const tenantName = invoice.contracts?.tenant_name ?? "—";
+
+                        return (
+                          <TableRow key={invoice.id}>
+                            <TableCell className="font-medium">{propertyName}</TableCell>
+                            <TableCell>{tenantName}</TableCell>
+                            <TableCell>
+                              {new Date(invoice.reference_month).toLocaleDateString("pt-BR", {
+                                month: "2-digit",
+                                year: "numeric"
+                              })}
+                            </TableCell>
+                            <TableCell>
+                              {new Date(invoice.due_date).toLocaleDateString("pt-BR")}
+                            </TableCell>
+                            <TableCell>
+                              R$ {Number(invoice.total_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={getStatusVariant(invoice.status)}>
+                                {getStatusLabel(invoice.status)}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </CardContent>
