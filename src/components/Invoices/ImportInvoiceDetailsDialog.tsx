@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
+import * as XLSX from "xlsx";
 import {
   Dialog,
   DialogContent,
@@ -158,8 +159,8 @@ const identifyField = (description: string): { field: string | null; label: stri
   return { field: null, label: null };
 };
 
-// Parseia o CSV/texto colado
-const parseCSV = (text: string): string[][] => {
+// Parseia texto colado (tab ou vírgula separado)
+const parseText = (text: string): string[][] => {
   const lines = text.trim().split("\n");
   return lines.map(line => {
     // Handle tab-separated or comma-separated
@@ -169,6 +170,13 @@ const parseCSV = (text: string): string[][] => {
     // Simple CSV parsing (doesn't handle quoted commas)
     return line.split(",").map(cell => cell.trim().replace(/^"|"$/g, ""));
   });
+};
+
+// Converte valor para string (para normalização)
+const cellToString = (cell: unknown): string => {
+  if (cell === null || cell === undefined) return "";
+  if (typeof cell === "number") return String(cell);
+  return String(cell).trim();
 };
 
 // Converte valor string para número
@@ -207,9 +215,16 @@ export function ImportInvoiceDetailsDialog({
     onOpenChange(false);
   };
 
-  // Processa os dados colados/importados
-  const processData = useCallback(async (text: string) => {
-    const rows = parseCSV(text);
+  // Processa os dados (aceita texto ou array de arrays do XLSX)
+  const processData = useCallback(async (data: string | unknown[][]) => {
+    let rows: string[][];
+    
+    if (typeof data === "string") {
+      rows = parseText(data);
+    } else {
+      // Converte array do XLSX para strings
+      rows = data.map(row => row.map(cell => cellToString(cell)));
+    }
     
     // Pula o cabeçalho
     const dataRows = rows.slice(1).filter(row => row.length > 0 && row[0]);
@@ -471,11 +486,27 @@ export function ImportInvoiceDetailsDialog({
     
     const reader = new FileReader();
     reader.onload = (event) => {
-      const text = event.target?.result as string;
-      setRawText(text);
-      processData(text);
+      try {
+        const data = event.target?.result;
+        const workbook = XLSX.read(data, { type: "array" });
+        
+        // Pega a primeira aba
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Converte para array de arrays
+        const jsonData = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1 });
+        
+        processData(jsonData);
+      } catch (err) {
+        toast({
+          title: "Erro ao ler arquivo",
+          description: "Não foi possível ler o arquivo Excel. Verifique se é um arquivo .xlsx válido.",
+          variant: "destructive",
+        });
+      }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handlePaste = () => {
@@ -516,7 +547,7 @@ export function ImportInvoiceDetailsDialog({
             Importar Detalhes das Faturas
           </DialogTitle>
           <DialogDescription>
-            {step === "upload" && "Cole os dados da planilha ou faça upload de um arquivo CSV"}
+            {step === "upload" && "Faça upload de um arquivo Excel (.xlsx) ou cole dados da planilha"}
             {step === "preview" && "Revise os dados antes de confirmar a importação"}
             {step === "importing" && "Importando dados..."}
             {step === "done" && "Importação concluída"}
@@ -543,11 +574,11 @@ export function ImportInvoiceDetailsDialog({
               <Separator />
               
               <div className="space-y-2">
-                <Label>Ou faça upload de um arquivo CSV</Label>
+                <Label>Ou faça upload de um arquivo Excel (.xlsx)</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     type="file"
-                    accept=".csv,.txt"
+                    accept=".xlsx,.xls"
                     onChange={handleFileUpload}
                     className="max-w-xs"
                   />
