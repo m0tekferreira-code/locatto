@@ -21,10 +21,17 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
-// An invoice is overdue when it is still pending and the due date is in the past.
+// An invoice is overdue when its status is 'overdue' (set by DB trigger) or still
+// pending past its due date.
 const isOverdue = (invoice: { status: string; due_date: string }) =>
-  (invoice.status === "pending" || invoice.status === "legal_collection") &&
-  new Date(invoice.due_date) < new Date();
+  invoice.status === "overdue" ||
+  (invoice.status === "pending" && new Date(invoice.due_date) < new Date());
+
+// Resolve the property id from the invoice directly or through its contract.
+const getInvoicePropertyId = (invoice: {
+  property_id?: string | null;
+  contracts?: { property_id?: string | null } | null;
+}) => invoice.property_id ?? invoice.contracts?.property_id ?? null;
 
 const getDateRange = (period: string): { start: Date | null; end: Date | null } => {
   const now = new Date();
@@ -54,8 +61,8 @@ const getStatusLabel = (status: string) => {
   switch (status) {
     case "paid": return "Pago";
     case "pending": return "Pendente";
+    case "overdue": return "Vencida";
     case "cancelled": return "Cancelada";
-    case "legal_collection": return "Cobrança Judicial";
     default: return status;
   }
 };
@@ -64,7 +71,7 @@ const getStatusVariant = (status: string): "default" | "secondary" | "destructiv
   switch (status) {
     case "paid": return "default";
     case "pending": return "secondary";
-    case "legal_collection": return "destructive";
+    case "overdue": return "destructive";
     case "cancelled": return "outline";
     default: return "outline";
   }
@@ -118,8 +125,15 @@ const ReportsList = () => {
         .select(`
           *,
           properties (
+            id,
             name,
             address
+          ),
+          contracts (
+            id,
+            property_id,
+            tenant_name,
+            rental_value
           )
         `)
         ;
@@ -134,7 +148,7 @@ const ReportsList = () => {
     if (!invoices) return [];
     const { start, end } = getDateRange(period);
     return invoices.filter((inv) => {
-      if (selectedProperty !== "all" && inv.property_id !== selectedProperty) return false;
+      if (selectedProperty !== "all" && getInvoicePropertyId(inv) !== selectedProperty) return false;
       if (start && end) {
         const due = new Date(inv.due_date);
         if (due < start || due > end) return false;
@@ -157,7 +171,7 @@ const ReportsList = () => {
         if (invoice.status === "paid") {
           acc.totalPaid += amount;
           acc.totalRevenue += amount;
-        } else if (invoice.status === "pending" || invoice.status === "legal_collection") {
+        } else if (invoice.status === "pending" || invoice.status === "overdue") {
           acc.totalPending += amount;
           if (isOverdue(invoice)) {
             acc.totalOverdue += amount;
@@ -338,7 +352,7 @@ const ReportsList = () => {
                       {properties
                         ?.filter(p => selectedProperty === "all" || p.id === selectedProperty)
                         .map((property) => {
-                          const propertyInvoices = filteredInvoices.filter(i => i.property_id === property.id);
+                          const propertyInvoices = filteredInvoices.filter(i => getInvoicePropertyId(i) === property.id);
                           const revenue = propertyInvoices
                             .filter(inv => inv.status === "paid")
                             .reduce((sum, inv) => sum + Number(inv.total_amount), 0);
@@ -438,6 +452,7 @@ const ReportsList = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Imóvel</TableHead>
+                        <TableHead>Inquilino</TableHead>
                         <TableHead>Vencimento</TableHead>
                         <TableHead>Valor</TableHead>
                         <TableHead>Dias em Atraso</TableHead>
@@ -453,6 +468,7 @@ const ReportsList = () => {
                                 (1000 * 60 * 60 * 24)
                             )
                           );
+                          const tenantName = invoice.contracts?.tenant_name ?? "—";
 
                           return (
                             <TableRow key={invoice.id}>
@@ -468,9 +484,10 @@ const ReportsList = () => {
                               <TableCell>
                                 <Badge variant="destructive">{daysOverdue} dias</Badge>
                               </TableCell>
+                              <TableCell>{tenantName}</TableCell>
                               <TableCell>
-                                <Badge variant={invoice.status === "legal_collection" ? "destructive" : "secondary"}>
-                                  {invoice.status === "legal_collection" ? "Cobrança Judicial" : "Pendente"}
+                                <Badge variant={getStatusVariant(invoice.status)}>
+                                  {getStatusLabel(invoice.status)}
                                 </Badge>
                               </TableCell>
                             </TableRow>
@@ -516,7 +533,7 @@ const ReportsList = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold text-orange-600">
-                      {filteredInvoices.filter(i => i.status === "pending" || i.status === "legal_collection").length}
+                      {filteredInvoices.filter(i => i.status === "pending" || i.status === "overdue").length}
                     </div>
                   </CardContent>
                 </Card>
