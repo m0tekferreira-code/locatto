@@ -491,9 +491,12 @@ export type Database = {
         Row: {
           account_id: string | null
           bank_data: Json | null
+          cleaning_fee: number | null
           condo_fee: number | null
           contract_id: string | null
           created_at: string | null
+          discount: number | null
+          discount_description: string | null
           due_date: string
           electricity_amount: number | null
           extra_charges: Json | null
@@ -520,9 +523,12 @@ export type Database = {
         Insert: {
           account_id?: string | null
           bank_data?: Json | null
+          cleaning_fee?: number | null
           condo_fee?: number | null
           contract_id?: string | null
           created_at?: string | null
+          discount?: number | null
+          discount_description?: string | null
           due_date: string
           electricity_amount?: number | null
           extra_charges?: Json | null
@@ -549,9 +555,12 @@ export type Database = {
         Update: {
           account_id?: string | null
           bank_data?: Json | null
+          cleaning_fee?: number | null
           condo_fee?: number | null
           contract_id?: string | null
           created_at?: string | null
+          discount?: number | null
+          discount_description?: string | null
           due_date?: string
           electricity_amount?: number | null
           extra_charges?: Json | null

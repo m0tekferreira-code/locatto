@@ -1,4 +1,5 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,16 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, CheckCircle, XCircle, FileText, Home, User, Calendar } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, FileText, Home, User, Calendar, Pencil } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { EditInvoiceDialog } from "@/components/Invoices/EditInvoiceDialog";
 
 const InvoiceDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -198,6 +201,13 @@ const InvoiceDetails = () => {
                 Voltar
               </Button>
               <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditDialogOpen(true)}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
                 {(invoice.status === "pending" || invoice.status === "overdue") && (
                   <>
                     <Button
@@ -421,6 +431,14 @@ const InvoiceDetails = () => {
                         </span>
                       </div>
                     )}
+                    {Number(invoice.cleaning_fee) > 0 && (
+                      <div className="flex justify-between">
+                        <span>Limpeza Lixeiras/Corredores</span>
+                        <span className="font-medium">
+                          R$ {Number(invoice.cleaning_fee).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
                     {Number(invoice.guarantee_installment) > 0 && (
                       <div className="flex justify-between">
                         <span>
@@ -450,6 +468,22 @@ const InvoiceDetails = () => {
                               </span>
                             </div>
                           ))}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Discount */}
+                    {Number(invoice.discount) > 0 && (
+                      <>
+                        <Separator className="my-2" />
+                        <div className="flex justify-between text-green-600">
+                          <span>
+                            Desconto
+                            {invoice.discount_description && ` (${invoice.discount_description})`}
+                          </span>
+                          <span className="font-medium">
+                            - R$ {Number(invoice.discount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          </span>
                         </div>
                       </>
                     )}
@@ -501,6 +535,18 @@ const InvoiceDetails = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Edit Invoice Dialog */}
+          <EditInvoiceDialog
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            invoice={invoice}
+            tenantCount={
+              1 + (invoice.contracts?.co_tenants && Array.isArray(invoice.contracts.co_tenants) 
+                ? invoice.contracts.co_tenants.length 
+                : 0)
+            }
+          />
     </AppLayout>
   );
 };
