@@ -408,18 +408,22 @@ const ReportsList = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Imóvel</TableHead>
+                        <TableHead>Imóvel / Contrato</TableHead>
+                        <TableHead>Inquilino</TableHead>
                         <TableHead>Vigência</TableHead>
                         <TableHead>Valor</TableHead>
-                        <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {contracts?.map((contract) => (
+                      {contracts
+                        ?.filter(c => c.status === "active")
+                        .filter(c => selectedProperty === "all" || c.property_id === selectedProperty)
+                        .map((contract) => (
                         <TableRow key={contract.id}>
                           <TableCell className="font-medium">
-                            {contract.properties?.name}
+                            {contract.properties?.name || contract.contract_number || "—"}
                           </TableCell>
+                          <TableCell>{contract.tenant_name}</TableCell>
                           <TableCell>
                             {new Date(contract.start_date).toLocaleDateString("pt-BR")} - {" "}
                             {contract.end_date ? new Date(contract.end_date).toLocaleDateString("pt-BR") : "Indeterminado"}
@@ -427,15 +431,15 @@ const ReportsList = () => {
                           <TableCell>
                             R$ {Number(contract.rental_value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                           </TableCell>
-                          <TableCell>
-                            <Badge variant={contract.status === "active" ? "default" : "destructive"}>
-                              {contract.status === "active" ? "Vigente" : "Vencido"}
-                            </Badge>
-                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
+                  {contracts?.filter(c => c.status === "active").length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      Nenhum contrato ativo encontrado
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
