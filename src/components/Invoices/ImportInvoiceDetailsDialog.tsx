@@ -179,15 +179,42 @@ const cellToString = (cell: unknown): string => {
   return String(cell).trim();
 };
 
-// Converte valor string para número
-const parseValue = (value: string): number => {
+// Converte valor de célula para número
+// Detecta se é número JS (do XLSX) ou string formatada em pt-BR
+const parseValue = (value: string | number): number => {
+  if (typeof value === "number") {
+    return isNaN(value) ? 0 : value;
+  }
   if (!value) return 0;
-  // Remove R$, espaços e converte vírgula para ponto
-  const cleaned = value
-    .replace(/R\$\s*/gi, "")
-    .replace(/\s/g, "")
-    .replace(/\./g, "") // Remove pontos de milhar
-    .replace(",", "."); // Vírgula decimal para ponto
+  
+  const str = String(value).trim();
+  
+  // Remove R$ e espaços
+  let cleaned = str.replace(/R\$\s*/gi, "").replace(/\s/g, "");
+  
+  // Detecta formato: se tem ponto E vírgula, assume pt-BR (1.234,56)
+  // Se tem só vírgula, assume pt-BR (1234,56 ou 932,68)
+  // Se tem só ponto, verifica se é decimal ou milhar
+  const hasComma = cleaned.includes(",");
+  const hasPeriod = cleaned.includes(".");
+  
+  if (hasComma && hasPeriod) {
+    // Formato pt-BR: 1.234,56 → remove pontos, troca vírgula por ponto
+    cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+  } else if (hasComma) {
+    // Só vírgula: assume decimal pt-BR (932,68)
+    cleaned = cleaned.replace(",", ".");
+  } else if (hasPeriod) {
+    // Só ponto: verifica posição. Se tem 3 dígitos após, é milhar. Senão, é decimal.
+    const periodIndex = cleaned.indexOf(".");
+    const afterPeriod = cleaned.slice(periodIndex + 1);
+    if (afterPeriod.length === 3 && !afterPeriod.includes(".")) {
+      // Provavelmente milhar (1.234 → 1234)
+      cleaned = cleaned.replace(/\./g, "");
+    }
+    // Senão, mantém como decimal (932.68 → 932.68)
+  }
+  
   return parseFloat(cleaned) || 0;
 };
 
