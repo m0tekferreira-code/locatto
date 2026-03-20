@@ -17,82 +17,66 @@ export const useResumoFinanceiro = (data_inicio: string, data_fim: string) => {
   return useQuery({
     queryKey: ["resumo-financeiro", data_inicio, data_fim],
     queryFn: async (): Promise<ResumoFinanceiro> => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error("Usuário não autenticado");
-      }
+      const [receitasRes, despesasRes, atrasadosRes] = await Promise.all([
+        supabase
+          .from("lancamentos_financeiros")
+          .select("valor")
+          .eq("tipo", "receita")
+          .eq("status", "pago")
+          .gte("data_pagamento", data_inicio)
+          .lte("data_pagamento", data_fim),
+        supabase
+          .from("lancamentos_financeiros")
+          .select("valor")
+          .eq("tipo", "despesa")
+          .eq("status", "pago")
+          .gte("data_pagamento", data_inicio)
+          .lte("data_pagamento", data_fim),
+        supabase
+          .from("lancamentos_financeiros")
+          .select("valor")
+          .eq("status", "atrasado"),
+      ]);
 
-      const { data, error } = await supabase.rpc("get_resumo_financeiro", {
-        p_user_id: user.id,
-        p_data_inicio: data_inicio,
-        p_data_fim: data_fim,
-      });
+      if (receitasRes.error) throw receitasRes.error;
+      if (despesasRes.error) throw despesasRes.error;
 
-      if (error) {
-        console.error("Erro ao buscar resumo financeiro:", error);
-        throw error;
-      }
-
-      // A função retorna um array com um único objeto
-      const resumo = data[0] || {
-        total_receitas: 0,
-        total_despesas: 0,
-        saldo: 0,
-        total_inadimplencia: 0,
-      };
+      const total_receitas = (receitasRes.data ?? []).reduce((s, r) => s + Number(r.valor), 0);
+      const total_despesas = (despesasRes.data ?? []).reduce((s, r) => s + Number(r.valor), 0);
+      const total_inadimplencia = (atrasadosRes.data ?? []).reduce((s, r) => s + Number(r.valor), 0);
 
       return {
-        total_receitas: Number(resumo.total_receitas),
-        total_despesas: Number(resumo.total_despesas),
-        saldo: Number(resumo.saldo),
-        total_inadimplencia: Number(resumo.total_inadimplencia),
+        total_receitas,
+        total_despesas,
+        saldo: total_receitas - total_despesas,
+        total_inadimplencia,
       };
     },
     enabled: !!data_inicio && !!data_fim,
   });
 };
 
-/**
- * Função assíncrona standalone para obter resumo financeiro
- * Útil para uso fora de componentes React
- */
 export async function getResumoFinanceiro(
   data_inicio: Date,
   data_fim: Date
 ): Promise<ResumoFinanceiro> {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    throw new Error("Usuário não autenticado");
-  }
-
-  // Converter datas para formato YYYY-MM-DD
   const dataInicioStr = data_inicio.toISOString().split('T')[0];
   const dataFimStr = data_fim.toISOString().split('T')[0];
 
-  const { data, error } = await supabase.rpc("get_resumo_financeiro", {
-    p_user_id: user.id,
-    p_data_inicio: dataInicioStr,
-    p_data_fim: dataFimStr,
-  });
+  const [receitasRes, despesasRes, atrasadosRes] = await Promise.all([
+    supabase.from("lancamentos_financeiros").select("valor").eq("tipo", "receita").eq("status", "pago").gte("data_pagamento", dataInicioStr).lte("data_pagamento", dataFimStr),
+    supabase.from("lancamentos_financeiros").select("valor").eq("tipo", "despesa").eq("status", "pago").gte("data_pagamento", dataInicioStr).lte("data_pagamento", dataFimStr),
+    supabase.from("lancamentos_financeiros").select("valor").eq("status", "atrasado"),
+  ]);
 
-  if (error) {
-    console.error("Erro ao buscar resumo financeiro:", error);
-    throw error;
-  }
-
-  const resumo = data[0] || {
-    total_receitas: 0,
-    total_despesas: 0,
-    saldo: 0,
-    total_inadimplencia: 0,
-  };
+  const total_receitas = (receitasRes.data ?? []).reduce((s, r) => s + Number(r.valor), 0);
+  const total_despesas = (despesasRes.data ?? []).reduce((s, r) => s + Number(r.valor), 0);
+  const total_inadimplencia = (atrasadosRes.data ?? []).reduce((s, r) => s + Number(r.valor), 0);
 
   return {
-    total_receitas: Number(resumo.total_receitas),
-    total_despesas: Number(resumo.total_despesas),
-    saldo: Number(resumo.saldo),
-    total_inadimplencia: Number(resumo.total_inadimplencia),
+    total_receitas,
+    total_despesas,
+    saldo: total_receitas - total_despesas,
+    total_inadimplencia,
   };
 }
