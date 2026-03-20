@@ -1,4 +1,7 @@
 import { useState, useMemo } from "react";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import * as XLSX from "xlsx";
 import { AppLayout } from "@/components/Layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -81,6 +84,7 @@ const ReportsList = () => {
   const { user } = useAuth();
   const [period, setPeriod] = useState("all");
   const [selectedProperty, setSelectedProperty] = useState("all");
+  const [activeTab, setActiveTab] = useState("financeiro");
 
   // Fetch properties
   const { data: properties } = useQuery({
@@ -196,6 +200,138 @@ const ReportsList = () => {
   const activeContracts = contracts?.filter(c => c.status === "active").length || 0;
   const expiredContracts = contracts?.filter(c => c.status === "expired").length || 0;
 
+  // Helper to resolve property name for an invoice
+  const resolvePropertyName = (invoice: any) =>
+    invoice.properties?.name ??
+    (invoice.contracts?.property_id
+      ? properties?.find((p: any) => p.id === invoice.contracts.property_id)?.name
+      : undefined) ??
+    "—";
+
+  // Build table data per tab for export
+  const getExportData = (): { title: string; head: string[]; rows: (string | number)[][] } => {
+    const fmt = (n: number) =>
+      n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+    const fmtDate = (d: string) => new Date(d).toLocaleDateString("pt-BR");
+
+    if (activeTab === "financeiro") {
+      const rows = (properties ?? [])
+        .filter((p: any) => selectedProperty === "all" || p.id === selectedProperty)
+        .map((p: any) => {
+          const inv = filteredInvoices.filter((i: any) => getInvoicePropertyId(i) === p.id);
+          const receita = inv.filter((i: any) => i.status === "paid")
+            .reduce((s: number, i: any) => s + Number(i.total_amount), 0);
+          const atrasadas = inv.filter(isOverdue).length;
+          return [p.name, `R$ ${fmt(receita)}`, atrasadas];
+        });
+      return {
+        title: "Relatório Financeiro – Receitas por Imóvel",
+        head: ["Imóvel", "Receita (Pago)", "Faturas Atrasadas"],
+        rows,
+      };
+    }
+
+    if (activeTab === "contratos") {
+      const rows = (contracts ?? [])
+        .filter((c: any) => c.status === "active")
+        .filter((c: any) => selectedProperty === "all" || c.property_id === selectedProperty)
+        .map((c: any) => [
+          c.properties?.name || c.contract_number || "—",
+          c.tenant_name,
+          `${fmtDate(c.start_date)} – ${c.end_date ? fmtDate(c.end_date) : "Indeterminado"}`,
+          `R$ ${fmt(Number(c.rental_value))}`,
+        ]);
+      return {
+        title: "Relatório de Contratos Ativos",
+        head: ["Imóvel / Contrato", "Inquilino", "Vigência", "Valor"],
+        rows,
+      };
+    }
+
+    if (activeTab === "inadimplencia") {
+      const rows = overdueInvoices.map((inv: any) => {
+        const days = Math.max(
+          0,
+          Math.floor((Date.now() - new Date(inv.due_date).getTime()) / 86400000)
+        );
+        return [
+          resolvePropertyName(inv),
+          inv.contracts?.tenant_name ?? "—",
+          fmtDate(inv.due_date),
+          `R$ ${fmt(Number(inv.total_amount))}`,
+          `${days} dias`,
+          getStatusLabel(inv.status),
+        ];
+      });
+      return {
+        title: "Relatório de Inadimplência",
+        head: ["Imóvel", "Inquilino", "Vencimento", "Valor", "Dias em Atraso", "Status"],
+        rows,
+      };
+    }
+
+    if (activeTab === "faturas") {
+      const rows = filteredInvoices.map((inv: any) => [
+        resolvePropertyName(inv),
+        inv.contracts?.tenant_name ?? "—",
+        fmtDate(inv.reference_month).substring(3), // MM/YYYY
+        fmtDate(inv.due_date),
+        `R$ ${fmt(Number(inv.total_amount))}`,
+        getStatusLabel(inv.status),
+      ]);
+      return {
+        title: "Relatório de Faturas",
+        head: ["Imóvel", "Inquilino", "Referência", "Vencimento", "Valor", "Status"],
+        rows,
+      };
+    }
+
+    // imoveis
+    const rows = (properties ?? [])
+      .filter((p: any) => selectedProperty === "all" || p.id === selectedProperty)
+      .map((p: any) => {
+        const contract = (contracts ?? []).find(
+          (c: any) => c.property_id === p.id && c.status === "active"
+        );
+        return [
+          p.name,
+          p.property_type ?? "—",
+          p.status === "rented" ? "Ocupado" : p.status === "available" ? "Disponível" : p.status,
+          contract ? `R$ ${fmt(Number(contract.rental_value))}` : "—",
+        ];
+      });
+    return {
+      title: "Relatório de Imóveis",
+      head: ["Imóvel", "Tipo", "Status", "Valor do Aluguel"],
+      rows,
+    };
+  };
+
+  const handleExportPDF = () => {
+    const { title, head, rows } = getExportData();
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(title, 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString("pt-BR")}`, 14, 28);
+    (doc as any).autoTable({
+      startY: 34,
+      head: [head],
+      body: rows,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [30, 30, 30] },
+    });
+    doc.save(`${activeTab}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
+  const handleExportExcel = () => {
+    const { title, head, rows } = getExportData();
+    const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, title.slice(0, 31));
+    XLSX.writeFile(wb, `${activeTab}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   const reportTypes = [
     {
       id: "financeiro",
@@ -265,11 +401,11 @@ const ReportsList = () => {
             </Select>
 
             <div className="flex gap-2 ml-auto">
-              <Button variant="outline">
+              <Button variant="outline" onClick={handleExportPDF}>
                 <Download className="mr-2 h-4 w-4" />
                 Exportar PDF
               </Button>
-              <Button variant="outline">
+              <Button variant="outline" onClick={handleExportExcel}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 Exportar Excel
               </Button>
@@ -277,7 +413,7 @@ const ReportsList = () => {
           </div>
 
           {/* Report Types */}
-          <Tabs defaultValue="financeiro" className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-5">
               {reportTypes.map((type) => (
                 <TabsTrigger key={type.id} value={type.id}>
