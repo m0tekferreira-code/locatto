@@ -39,6 +39,7 @@ import ImportarExtrato from "./pages/Financial/ImportarExtrato";
 import PortalSettings from "./pages/Properties/PortalSettings";
 import GeneralSettings from "./pages/Settings/GeneralSettings";
 import ImportConciliacao from "./pages/Settings/ImportConciliacao";
+import ProfileSettings from "./pages/Settings/ProfileSettings";
 import ContactsList from "./pages/Contacts/ContactsList";
 import ContactDetails from "./pages/Contacts/ContactDetails";
 import InspectionWizard from "./pages/Inspections/InspectionWizard";
@@ -178,6 +179,11 @@ const App = () => (
             <Route path="/configuracoes/portais" element={
               <ProtectedRoute>
                 <PortalSettings />
+              </ProtectedRoute>
+            } />
+            <Route path="/configuracoes/perfil" element={
+              <ProtectedRoute>
+                <ProfileSettings />
               </ProtectedRoute>
             } />
             <Route path="/vistorias" element={

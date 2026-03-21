@@ -68,6 +68,7 @@ const menuItems = [
     submenu: [
       { label: "Geral", path: "/configuracoes" },
       { label: "Portais Imobiliários", path: "/configuracoes/portais" },
+      { label: "Meu Perfil", path: "/configuracoes/perfil" },
     ],
   },
   { icon: UserCircle, label: "Usuários", path: "/usuarios" },
