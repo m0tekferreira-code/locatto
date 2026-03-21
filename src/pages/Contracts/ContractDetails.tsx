@@ -240,25 +240,32 @@ export default function ContractDetails() {
             <CardTitle>Participantes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div>
-              <h3 className="font-semibold mb-3">Proprietário</h3>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Nome</p>
-                  <p className="font-medium">{property?.owner_name || "N/A"}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+            {property ? (
+              <div>
+                <h3 className="font-semibold mb-3">Proprietário</h3>
+                <div className="space-y-2">
                   <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">{property?.owner_email || "N/A"}</p>
+                    <p className="text-sm text-muted-foreground">Nome</p>
+                    <p className="font-medium">{property.owner_name || "N/A"}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Telefone</p>
-                    <p className="font-medium">{property?.owner_contact || "N/A"}</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Email</p>
+                      <p className="font-medium">{property.owner_email || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Telefone</p>
+                      <p className="font-medium">{property.owner_contact || "N/A"}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <AlertCircle className="h-4 w-4" />
+                <p className="text-sm">Proprietário não identificado — nenhum imóvel vinculado.</p>
+              </div>
+            )}
 
             <Separator />
 
@@ -271,12 +278,32 @@ export default function ContractDetails() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <p className="text-sm text-muted-foreground">CPF</p>
+                    <p className="font-medium">{contract.tenant_document || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">RG</p>
+                    <p className="font-medium">{contract.tenant_rg || "N/A"}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
                     <p className="text-sm text-muted-foreground">Email</p>
                     <p className="font-medium">{contract.tenant_email || "N/A"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Telefone</p>
                     <p className="font-medium">{contract.tenant_phone || "N/A"}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Profissão</p>
+                    <p className="font-medium">{contract.tenant_profession || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Tel. Emergência</p>
+                    <p className="font-medium">{contract.tenant_emergency_phone || "N/A"}</p>
                   </div>
                 </div>
               </div>
@@ -359,7 +386,7 @@ export default function ContractDetails() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Vencimento</p>
-                <p className="font-medium">Todo dia {contract.payment_day}</p>
+                <p className="font-medium">{contract.payment_day ? `Todo dia ${contract.payment_day}` : "N/A"}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Índice de Inflação</p>
@@ -374,7 +401,13 @@ export default function ContractDetails() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Método de Pagamento</p>
-                <p className="font-medium">{contract.payment_method === "bank_transfer" ? "Transferência Bancária" : contract.payment_method}</p>
+                <p className="font-medium">{
+                  contract.payment_method === "bank_transfer" ? "Transferência Bancária" :
+                  contract.payment_method === "pix" ? "PIX" :
+                  contract.payment_method === "cash" ? "Dinheiro" :
+                  contract.payment_method === "check" ? "Cheque" :
+                  contract.payment_method || "N/A"
+                }</p>
               </div>
             </div>
 
