@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountId } from "@/hooks/useAccountId";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { AppLayout } from "@/components/Layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,13 +51,12 @@ const UsersList = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [isAdmin, setIsAdmin] = useState(false);
   const { user } = useAuth();
   const { accountId } = useAccountId();
   const { toast } = useToast();
+  const { isAdmin, loading: adminLoading } = useAdminCheck();
 
   useEffect(() => {
-    checkAdminStatus();
     if (accountId) {
       fetchUsers();
     }
@@ -65,24 +65,6 @@ const UsersList = () => {
   useEffect(() => {
     filterUsers();
   }, [searchTerm, users]);
-
-  const checkAdminStatus = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .in("role", ["admin", "super_admin"])
-        .maybeSingle();
-
-      if (error) throw error;
-      setIsAdmin(!!data);
-    } catch (error) {
-      console.error("Error checking admin status:", error);
-    }
-  };
 
   const fetchUsers = async () => {
     if (!user || !accountId) return;
@@ -260,6 +242,20 @@ const UsersList = () => {
       setSelectedUsers(filteredUsers.map((u) => u.id));
     }
   };
+
+  if (adminLoading) {
+    return (
+      <AppLayout title="Usuários">
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center text-muted-foreground">
+              <p>Verificando permissões...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </AppLayout>
+    );
+  }
 
   if (!isAdmin) {
     return (
