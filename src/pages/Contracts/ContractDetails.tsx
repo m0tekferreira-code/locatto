@@ -53,6 +53,14 @@ interface Property {
   owner_email: string | null;
 }
 
+interface TenantContact {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  document: string | null;
+}
+
 interface Invoice {
   id: string;
   invoice_number: string | null;
@@ -72,6 +80,7 @@ export default function ContractDetails() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [extraChargesOpen, setExtraChargesOpen] = useState(false);
+  const [tenantContact, setTenantContact] = useState<TenantContact | null>(null);
 
   useEffect(() => {
     if (user && id) {
@@ -90,6 +99,17 @@ export default function ContractDetails() {
 
       if (contractError) throw contractError;
       setContract(contractData as any);
+
+      // Fetch matching contact by tenant_name (fallback for null fields)
+      if (contractData.tenant_name) {
+        const { data: contactData } = await supabase
+          .from("contacts")
+          .select("id, name, email, phone, document")
+          .ilike("name", `%${contractData.tenant_name}%`)
+          .limit(1)
+          .maybeSingle();
+        if (contactData) setTenantContact(contactData as TenantContact);
+      }
 
       // Fetch property (only if property_id exists)
       if (contractData.property_id) {
@@ -279,7 +299,7 @@ export default function ContractDetails() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">CPF</p>
-                    <p className="font-medium">{contract.tenant_document || "N/A"}</p>
+                    <p className="font-medium">{contract.tenant_document || tenantContact?.document || "N/A"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">RG</p>
@@ -289,11 +309,11 @@ export default function ContractDetails() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">{contract.tenant_email || "N/A"}</p>
+                    <p className="font-medium">{contract.tenant_email || tenantContact?.email || "N/A"}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Telefone</p>
-                    <p className="font-medium">{contract.tenant_phone || "N/A"}</p>
+                    <p className="font-medium">{contract.tenant_phone || tenantContact?.phone || "N/A"}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
