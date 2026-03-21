@@ -196,7 +196,7 @@ const InspectionWizard = () => {
       </p>
 
       {/* Step content */}
-      <div className="pb-24">
+      <div className="pb-4">
         {step === 0 && <StepContractSelect data={data} setData={setData} />}
         {step === 1 && <StepChecklist data={data} setData={setData} />}
         {step === 2 && <StepEvidence data={data} setData={setData} />}
@@ -204,8 +204,8 @@ const InspectionWizard = () => {
         {step === 4 && <StepSummary data={data} />}
       </div>
 
-      {/* Sticky bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border p-4 flex gap-3 safe-area-bottom">
+      {/* Sticky bottom bar — sticky within the content column, so it never overlaps the sidebar */}
+      <div className="sticky bottom-0 -mx-4 md:-mx-6 -mb-4 md:-mb-6 bg-background border-t border-border p-4 flex gap-3">
         {/* Online status pill */}
         <div className={cn(
           "absolute -top-8 right-4 flex items-center gap-1.5 px-3 py-1 rounded-t-lg text-xs font-medium",
