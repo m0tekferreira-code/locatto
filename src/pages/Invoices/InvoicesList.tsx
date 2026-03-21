@@ -260,26 +260,8 @@ const InvoicesList = () => {
     { paid: 0, pending: 0, total: 0 }
   );
 
-  const hasPendingInvoices = invoices?.some(
-    (invoice) => invoice.status === "overdue"
-  );
-
   return (
     <AppLayout title="Faturas">
-          {/* Alert for pending invoices */}
-          {hasPendingInvoices && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Ops! Temos faturas pendentes</strong>
-                <p className="text-sm mt-1">
-                  Notamos que você possui faturas pendentes. Para continuar aproveitando todos os recursos da plataforma, 
-                  por favor, confira suas faturas. Seu acesso está temporariamente limitado até a regularização dos pagamentos.
-                </p>
-              </AlertDescription>
-            </Alert>
-          )}
-
           {/* Bulk Generation Section */}
           <Card className="mb-6">
             <CardHeader>
