@@ -64,10 +64,19 @@ export const PropertySummaryCard = ({ unavailable, contracted, available, announ
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <div className="h-2.5 w-2.5 rounded-full bg-success" />
-                <span className="text-xs text-muted-foreground">Anunciados</span>
+                <span className="text-xs text-muted-foreground">Disponíveis</span>
               </div>
-              <span className="text-sm font-bold">{announced}</span>
+              <span className="text-sm font-bold">{available}</span>
             </div>
+            {announced > 0 && (
+              <div className="flex items-center justify-between pt-1 border-t">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-primary/60" />
+                  <span className="text-xs text-muted-foreground">Anunciados</span>
+                </div>
+                <span className="text-sm font-bold">{announced}</span>
+              </div>
+            )}
           </div>
         </div>
 

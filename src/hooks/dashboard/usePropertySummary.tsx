@@ -30,10 +30,10 @@ export const usePropertySummary = (userId: string | undefined, accountId: string
 
       return {
         total,
-        available: statusCount.available || 0,
-        rented: statusCount.rented || 0,
-        maintenance: statusCount.maintenance || 0,
-        reserved: statusCount.reserved || 0,
+        available: (statusCount.available || 0) + (statusCount.disponivel || 0) + (statusCount.Disponível || 0),
+        rented: (statusCount.rented || 0) + (statusCount.alugado || 0) + (statusCount.ocupado || 0),
+        maintenance: (statusCount.maintenance || 0) + (statusCount.em_manutencao || 0) + (statusCount.indisponivel || 0),
+        reserved: (statusCount.reserved || 0) + (statusCount.reservado || 0),
       };
     },
     enabled: !!userId,

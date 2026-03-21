@@ -93,6 +93,7 @@ const Index = () => {
               openInvoices={(stats?.pendingInvoices || 0) + (stats?.overdueInvoices || 0)}
               overdueInvoices={stats?.overdueInvoices || 0}
               totalBilled={stats?.totalBilled || 0}
+              monthlyRevenue={stats?.monthlyRevenue || 0}
             />
             {propertySummaryLoading ? (
               <Skeleton className="h-64" />

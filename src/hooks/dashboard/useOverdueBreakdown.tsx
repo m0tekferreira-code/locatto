@@ -36,7 +36,13 @@ export const useOverdueBreakdown = (userId: string | undefined, accountId: strin
           due_date,
           total_amount,
           status,
-          contract:contracts(tenant_name, tenant_phone, tenant_email),
+          property_id,
+          contract:contracts(
+            tenant_name,
+            tenant_phone,
+            tenant_email,
+            property:properties(name)
+          ),
           property:properties(name)
         `)
         .eq(filterColumn, filterValue)
@@ -60,11 +66,16 @@ export const useOverdueBreakdown = (userId: string | undefined, accountId: strin
         const days = differenceInDays(today, dueDate);
         if (days < 1) return;
 
+        const resolvedProperty =
+          (inv.property as any)?.name ||
+          (inv.contract as any)?.property?.name ||
+          null;
+
         const bucket = buckets.find((b) => days >= b.minDays && days <= b.maxDays);
         if (bucket) {
           bucket.count++;
           bucket.total += Number(inv.total_amount || 0);
-          bucket.invoices.push({ ...inv, daysOverdue: days });
+          bucket.invoices.push({ ...inv, daysOverdue: days, resolvedProperty });
         }
       });
 

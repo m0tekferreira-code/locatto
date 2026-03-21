@@ -7,12 +7,14 @@ interface FinancialSummaryCardProps {
   openInvoices: number;
   overdueInvoices: number;
   totalBilled: number;
+  monthlyRevenue?: number;
 }
 
 export const FinancialSummaryCard = ({ 
   openInvoices, 
   overdueInvoices, 
-  totalBilled 
+  totalBilled,
+  monthlyRevenue = 0,
 }: FinancialSummaryCardProps) => {
   const navigate = useNavigate();
 
@@ -40,9 +42,16 @@ export const FinancialSummaryCard = ({
           <p className="text-2xl font-bold text-destructive">{overdueInvoices}</p>
 
           <div>
-            <span className="text-sm text-muted-foreground">Valor faturado</span>
-            <p className="text-xl font-bold text-info">
-              R$ {totalBilled.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <span className="text-sm text-muted-foreground">A receber</span>
+            <p className="text-xl font-bold text-warning">
+              {totalBilled.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </p>
+          </div>
+
+          <div>
+            <span className="text-sm text-muted-foreground">Recebido este mês</span>
+            <p className="text-xl font-bold text-success">
+              {monthlyRevenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
             </p>
           </div>
         </div>

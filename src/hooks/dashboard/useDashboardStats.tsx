@@ -88,14 +88,14 @@ export const useDashboardStats = (userId: string | undefined, accountId: string 
         .eq(filterColumn, filterValue)
         .eq("status", "overdue");
 
-      // Total billed (all invoices amount)
-      const { data: allInvoices } = await supabase
+      // Pending amount A receber (pending + overdue sum)
+      const { data: openInvoicesData } = await supabase
         .from("invoices")
         .select("total_amount")
         .eq(filterColumn, filterValue)
-        .in("status", ["pending", "overdue", "paid"]);
+        .in("status", ["pending", "overdue"]);
 
-      const totalBilled = allInvoices?.reduce(
+      const totalBilled = openInvoicesData?.reduce(
         (sum, inv) => sum + Number(inv.total_amount || 0),
         0
       ) || 0;

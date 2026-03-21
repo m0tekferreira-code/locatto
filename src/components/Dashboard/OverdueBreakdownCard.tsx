@@ -41,7 +41,7 @@ const invoicesToRows = (invoices: any[]) =>
     Cliente: inv.contract?.tenant_name || "N/A",
     Telefone: inv.contract?.tenant_phone || "-",
     Email: inv.contract?.tenant_email || "-",
-    Imóvel: inv.property?.name || "-",
+    Imóvel: inv.resolvedProperty || inv.property?.name || "-",
     Vencimento: new Date(inv.due_date).toLocaleDateString("pt-BR"),
     "Dias em Atraso": inv.daysOverdue,
     Valor: Number(inv.total_amount || 0),
@@ -264,7 +264,7 @@ export const OverdueBreakdownCard = ({
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {inv.property?.name || "-"}
+                            {inv.resolvedProperty || inv.property?.name || "-"}
                           </p>
                           <div className="flex justify-between items-center">
                             <span className="font-semibold text-sm">
@@ -303,7 +303,7 @@ export const OverdueBreakdownCard = ({
                               {inv.contract?.tenant_name || "N/A"}
                             </TableCell>
                             <TableCell className="max-w-[200px] truncate">
-                              {inv.property?.name || "-"}
+                              {inv.resolvedProperty || inv.property?.name || "-"}
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge
