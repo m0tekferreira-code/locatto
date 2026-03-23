@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AppLayout } from "@/components/Layout/AppLayout";
 import { ContractStatCard } from "@/components/Dashboard/ContractStatCard";
 import { FinancialSummaryCard } from "@/components/Dashboard/FinancialSummaryCard";
@@ -6,6 +7,9 @@ import { CommercialCard } from "@/components/Dashboard/CommercialCard";
 import { CalculatorCard } from "@/components/Dashboard/CalculatorCard";
 import { InvoicesTable } from "@/components/Dashboard/InvoicesTable";
 import { OverdueBreakdownCard } from "@/components/Dashboard/OverdueBreakdownCard";
+import { InflacaoCalculatorDialog } from "@/components/Dashboard/InflacaoCalculatorDialog";
+import { JurosMultaCalculatorDialog } from "@/components/Dashboard/JurosMultaCalculatorDialog";
+import { FinanciamentoCalculatorDialog } from "@/components/Dashboard/FinanciamentoCalculatorDialog";
 import { AlertTriangle, RefreshCw, FileCheck, MessageSquare, Calculator, TrendingUp, Percent } from "lucide-react";
 import { useDashboardStats } from "@/hooks/dashboard/useDashboardStats";
 import { useRecentInvoices } from "@/hooks/dashboard/useRecentInvoices";
@@ -19,6 +23,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 const Index = () => {
   const { user } = useAuth();
   const { accountId } = useAccountId();
+
+  const [inflacaoOpen, setInflacaoOpen] = useState(false);
+  const [jurosOpen, setJurosOpen] = useState(false);
+  const [financiamentoOpen, setFinanciamentoOpen] = useState(false);
   
   // Auto-detectar problemas de RLS e sugerir correção
   useRlsAutoDetect();
@@ -138,13 +146,17 @@ const Index = () => {
         </div>
         <div className="space-y-4">
           <div className="grid grid-cols-3 lg:grid-cols-1 gap-4">
-            <CalculatorCard icon={TrendingUp} title="Calculadora de Inflação" />
-            <CalculatorCard icon={Percent} title="Calculadora de Juros/Multa" />
-            <CalculatorCard icon={Calculator} title="Calculadora de financiamento" />
+            <CalculatorCard icon={TrendingUp} title="Calculadora de Inflação" onClick={() => setInflacaoOpen(true)} />
+            <CalculatorCard icon={Percent} title="Calculadora de Juros/Multa" onClick={() => setJurosOpen(true)} />
+            <CalculatorCard icon={Calculator} title="Calculadora de financiamento" onClick={() => setFinanciamentoOpen(true)} />
           </div>
         </div>
       </div>
     </AppLayout>
+
+    <InflacaoCalculatorDialog open={inflacaoOpen} onOpenChange={setInflacaoOpen} />
+    <JurosMultaCalculatorDialog open={jurosOpen} onOpenChange={setJurosOpen} />
+    <FinanciamentoCalculatorDialog open={financiamentoOpen} onOpenChange={setFinanciamentoOpen} />
   );
 };
 
