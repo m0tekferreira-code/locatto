@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ExtraChargesDialog } from "@/components/Contracts/ExtraChargesDialog";
+import { ContractHistoryTimeline } from "@/components/Contracts/ContractHistoryTimeline";
+import { useLogContractEvent } from "@/hooks/useContractHistory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +83,7 @@ export default function ContractDetails() {
   const [loading, setLoading] = useState(true);
   const [extraChargesOpen, setExtraChargesOpen] = useState(false);
   const [tenantContact, setTenantContact] = useState<TenantContact | null>(null);
+  const { mutate: logEvent } = useLogContractEvent();
 
   useEffect(() => {
     if (user && id) {
@@ -518,6 +521,12 @@ export default function ContractDetails() {
                       const newDoc = { name: file.name, path: storagePath, type: file.type, size: file.size, uploaded_at: new Date().toISOString() };
                       await supabase.from("contracts").update({ documents: [...docs, newDoc] } as any).eq("id", contract.id);
                       toast.success(`${file.name} anexado`);
+                      logEvent({
+                        contractId: contract.id,
+                        eventType: "document_uploaded",
+                        description: `Documento anexado: ${file.name}`,
+                        metadata: { file_name: file.name, file_size: file.size },
+                      });
                     }
                     fetchContractDetails();
                   }}
@@ -628,11 +637,23 @@ export default function ContractDetails() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Histórico */}
+        <ContractHistoryTimeline contractId={contract.id} />
       </div>
 
       <ExtraChargesDialog
         open={extraChargesOpen}
-        onOpenChange={setExtraChargesOpen}
+        onOpenChange={(open) => {
+          setExtraChargesOpen(open);
+          if (!open) {
+            logEvent({
+              contractId: contract.id,
+              eventType: "extra_charge_added",
+              description: "Cobranças adicionais atualizadas",
+            });
+          }
+        }}
         contractId={contract.id}
         contractEndDate={contract.end_date}
         existingCharges={contract.extra_charges || []}
