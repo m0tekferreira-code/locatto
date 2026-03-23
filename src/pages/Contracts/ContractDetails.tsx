@@ -2,15 +2,22 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccountId } from "@/hooks/useAccountId";
+import { useQuery } from "@tanstack/react-query";
 import { ExtraChargesDialog } from "@/components/Contracts/ExtraChargesDialog";
 import { ContractHistoryTimeline } from "@/components/Contracts/ContractHistoryTimeline";
 import { useLogContractEvent } from "@/hooks/useContractHistory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, FileText, Download, AlertCircle, Plus, Edit, Upload, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ArrowLeft, Building2, FileText, Download, AlertCircle, Plus, Edit, Upload, Trash2, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -77,6 +84,7 @@ export default function ContractDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { accountId } = useAccountId();
   const [contract, setContract] = useState<Contract | null>(null);
   const [property, setProperty] = useState<Property | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -84,6 +92,50 @@ export default function ContractDetails() {
   const [extraChargesOpen, setExtraChargesOpen] = useState(false);
   const [tenantContact, setTenantContact] = useState<TenantContact | null>(null);
   const { mutate: logEvent } = useLogContractEvent();
+
+  // Estados para vincular imóvel
+  const [linkPropertyOpen, setLinkPropertyOpen] = useState(false);
+  const [selectedPropertyId, setSelectedPropertyId] = useState("");
+  const [savingLink, setSavingLink] = useState(false);
+
+  // Estados para editar contrato
+  const [editOpen, setEditOpen] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    tenant_name: "",
+    tenant_document: "",
+    tenant_rg: "",
+    tenant_email: "",
+    tenant_phone: "",
+    tenant_profession: "",
+    tenant_emergency_phone: "",
+    contract_number: "",
+    start_date: "",
+    end_date: "",
+    rental_value: "",
+    payment_day: "",
+    payment_method: "",
+    adjustment_index: "",
+    pre_paid: false,
+    guarantee_type: "",
+    guarantee_value: "",
+  });
+
+  // Query de imóveis disponíveis para vincular
+  const { data: availableProperties } = useQuery({
+    queryKey: ["available-properties-link", accountId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("id, name, address, status")
+        .eq("account_id", accountId!)
+        .in("status", ["disponivel", "available"])
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!accountId && linkPropertyOpen,
+  });
 
   useEffect(() => {
     if (user && id) {
@@ -141,6 +193,86 @@ export default function ContractDetails() {
       toast.error("Erro ao carregar dados do contrato");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLinkProperty = async () => {
+    if (!selectedPropertyId || !contract) return;
+    setSavingLink(true);
+    try {
+      const { error } = await supabase
+        .from("contracts")
+        .update({ property_id: selectedPropertyId })
+        .eq("id", contract.id);
+      if (error) throw error;
+
+      await supabase
+        .from("properties")
+        .update({ status: "rented" })
+        .eq("id", selectedPropertyId);
+
+      logEvent({
+        contractId: contract.id,
+        eventType: "contract_updated",
+        description: "Imóvel vinculado ao contrato",
+        metadata: { property_id: selectedPropertyId },
+      });
+
+      toast.success("Imóvel vinculado com sucesso!");
+      setLinkPropertyOpen(false);
+      setSelectedPropertyId("");
+      fetchContractDetails();
+    } catch (err: any) {
+      toast.error("Erro ao vincular imóvel: " + err.message);
+    } finally {
+      setSavingLink(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!contract) return;
+    setSavingEdit(true);
+    try {
+      const payload: Record<string, any> = {
+        tenant_name: editForm.tenant_name,
+        tenant_document: editForm.tenant_document || null,
+        tenant_rg: editForm.tenant_rg || null,
+        tenant_email: editForm.tenant_email || null,
+        tenant_phone: editForm.tenant_phone || null,
+        tenant_profession: editForm.tenant_profession || null,
+        tenant_emergency_phone: editForm.tenant_emergency_phone || null,
+        contract_number: editForm.contract_number || null,
+        start_date: editForm.start_date,
+        end_date: editForm.end_date || null,
+        rental_value: parseFloat(editForm.rental_value) || contract.rental_value,
+        payment_day: parseInt(editForm.payment_day) || contract.payment_day,
+        payment_method: editForm.payment_method || contract.payment_method,
+        adjustment_index: editForm.adjustment_index || null,
+        pre_paid: editForm.pre_paid,
+        guarantee_type: editForm.guarantee_type || null,
+        guarantee_value: editForm.guarantee_value ? parseFloat(editForm.guarantee_value) : null,
+      };
+
+      const { error } = await supabase
+        .from("contracts")
+        .update(payload)
+        .eq("id", contract.id);
+
+      if (error) throw error;
+
+      logEvent({
+        contractId: contract.id,
+        eventType: "contract_updated",
+        description: "Dados do contrato editados",
+      });
+
+      toast.success("Contrato atualizado!");
+      setEditOpen(false);
+      fetchContractDetails();
+    } catch (err: any) {
+      toast.error("Erro ao salvar: " + err.message);
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -249,9 +381,19 @@ export default function ContractDetails() {
               <CardTitle>Imóvel</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <AlertCircle className="h-4 w-4" />
-                <p className="text-sm">Nenhum imóvel vinculado a este contrato.</p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <AlertCircle className="h-4 w-4" />
+                  <p className="text-sm">Nenhum imóvel vinculado a este contrato.</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLinkPropertyOpen(true)}
+                >
+                  <Link2 className="mr-2 h-4 w-4" />
+                  Vincular Imóvel
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -380,7 +522,38 @@ export default function ContractDetails() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               Dados do Contrato
-              {getStatusBadge(contract.status)}
+              <div className="flex items-center gap-2">
+                {getStatusBadge(contract.status)}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditForm({
+                      tenant_name: contract.tenant_name ?? "",
+                      tenant_document: contract.tenant_document ?? "",
+                      tenant_rg: contract.tenant_rg ?? "",
+                      tenant_email: contract.tenant_email ?? "",
+                      tenant_phone: contract.tenant_phone ?? "",
+                      tenant_profession: contract.tenant_profession ?? "",
+                      tenant_emergency_phone: contract.tenant_emergency_phone ?? "",
+                      contract_number: contract.contract_number ?? "",
+                      start_date: contract.start_date ?? "",
+                      end_date: contract.end_date ?? "",
+                      rental_value: String(contract.rental_value ?? ""),
+                      payment_day: String(contract.payment_day ?? ""),
+                      payment_method: contract.payment_method ?? "",
+                      adjustment_index: contract.adjustment_index ?? "",
+                      pre_paid: contract.pre_paid ?? false,
+                      guarantee_type: contract.guarantee_type ?? "",
+                      guarantee_value: contract.guarantee_value ? String(contract.guarantee_value) : "",
+                    });
+                    setEditOpen(true);
+                  }}
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -641,6 +814,270 @@ export default function ContractDetails() {
         {/* Histórico */}
         <ContractHistoryTimeline contractId={contract.id} />
       </div>
+
+      {/* Dialog: Vincular Imóvel */}
+      <Dialog open={linkPropertyOpen} onOpenChange={setLinkPropertyOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Vincular Imóvel ao Contrato
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Label className="mb-2 block">Selecione o imóvel disponível</Label>
+            <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Escolha um imóvel..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableProperties && availableProperties.length > 0 ? (
+                  availableProperties.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}{p.address ? ` — ${p.address}` : ""}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>
+                    Nenhum imóvel disponível
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkPropertyOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleLinkProperty}
+              disabled={!selectedPropertyId || savingLink}
+            >
+              {savingLink ? "Vinculando..." : "Vincular"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Editar Contrato */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Editar Contrato
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {/* Inquilino */}
+            <div>
+              <h4 className="font-semibold text-sm mb-3">Dados do Inquilino</h4>
+              <div className="space-y-3">
+                <div>
+                  <Label>Nome Completo *</Label>
+                  <Input
+                    value={editForm.tenant_name}
+                    onChange={(e) => setEditForm(f => ({ ...f, tenant_name: e.target.value }))}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>CPF/CNPJ</Label>
+                    <Input
+                      value={editForm.tenant_document}
+                      onChange={(e) => setEditForm(f => ({ ...f, tenant_document: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>RG</Label>
+                    <Input
+                      value={editForm.tenant_rg}
+                      onChange={(e) => setEditForm(f => ({ ...f, tenant_rg: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={editForm.tenant_email}
+                      onChange={(e) => setEditForm(f => ({ ...f, tenant_email: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Telefone</Label>
+                    <Input
+                      value={editForm.tenant_phone}
+                      onChange={(e) => setEditForm(f => ({ ...f, tenant_phone: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Profissão</Label>
+                    <Input
+                      value={editForm.tenant_profession}
+                      onChange={(e) => setEditForm(f => ({ ...f, tenant_profession: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Tel. Emergência</Label>
+                    <Input
+                      value={editForm.tenant_emergency_phone}
+                      onChange={(e) => setEditForm(f => ({ ...f, tenant_emergency_phone: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Dados do Contrato */}
+            <div>
+              <h4 className="font-semibold text-sm mb-3">Dados do Contrato</h4>
+              <div className="space-y-3">
+                <div>
+                  <Label>Número do Contrato</Label>
+                  <Input
+                    value={editForm.contract_number}
+                    onChange={(e) => setEditForm(f => ({ ...f, contract_number: e.target.value }))}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Data de Início *</Label>
+                    <Input
+                      type="date"
+                      value={editForm.start_date}
+                      onChange={(e) => setEditForm(f => ({ ...f, start_date: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Data de Término</Label>
+                    <Input
+                      type="date"
+                      value={editForm.end_date}
+                      onChange={(e) => setEditForm(f => ({ ...f, end_date: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Valor do Aluguel (R$) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editForm.rental_value}
+                      onChange={(e) => setEditForm(f => ({ ...f, rental_value: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Dia de Vencimento</Label>
+                    <Select
+                      value={editForm.payment_day}
+                      onValueChange={(v) => setEditForm(f => ({ ...f, payment_day: v }))}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                          <SelectItem key={d} value={String(d)}>Dia {d}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Método de Pagamento</Label>
+                    <Select
+                      value={editForm.payment_method}
+                      onValueChange={(v) => setEditForm(f => ({ ...f, payment_method: v }))}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bank_transfer">Transferência Bancária</SelectItem>
+                        <SelectItem value="pix">PIX</SelectItem>
+                        <SelectItem value="boleto">Boleto</SelectItem>
+                        <SelectItem value="debit">Débito Automático</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Índice de Reajuste</Label>
+                    <Select
+                      value={editForm.adjustment_index}
+                      onValueChange={(v) => setEditForm(f => ({ ...f, adjustment_index: v }))}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="IPCA">IPCA</SelectItem>
+                        <SelectItem value="IGPM">IGP-M</SelectItem>
+                        <SelectItem value="INPC">INPC</SelectItem>
+                        <SelectItem value="custom">Personalizado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="edit_pre_paid"
+                    checked={editForm.pre_paid}
+                    onCheckedChange={(checked) => setEditForm(f => ({ ...f, pre_paid: !!checked }))}
+                  />
+                  <Label htmlFor="edit_pre_paid" className="cursor-pointer">Cobrança Pré-Paga</Label>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Garantia */}
+            <div>
+              <h4 className="font-semibold text-sm mb-3">Garantia</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Tipo de Garantia</Label>
+                  <Select
+                    value={editForm.guarantee_type}
+                    onValueChange={(v) => setEditForm(f => ({ ...f, guarantee_type: v }))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="deposit">Caução em Dinheiro</SelectItem>
+                      <SelectItem value="guarantor">Fiador</SelectItem>
+                      <SelectItem value="insurance">Seguro Fiança</SelectItem>
+                      <SelectItem value="none">Sem Garantia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editForm.guarantee_type && editForm.guarantee_type !== "none" && (
+                  <div>
+                    <Label>Valor da Garantia (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editForm.guarantee_value}
+                      onChange={(e) => setEditForm(f => ({ ...f, guarantee_value: e.target.value }))}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ExtraChargesDialog
         open={extraChargesOpen}
