@@ -238,15 +238,20 @@ export type Database = {
         Row: {
           account_id: string | null
           adjustment_index: string | null
+          cleaning_fee: number | null
           co_tenants: Json | null
+          condo_fee: number | null
           contract_number: string | null
           created_at: string | null
           documents: Json | null
+          electricity_amount: number | null
           end_date: string | null
           extra_charges: Json | null
+          gas_amount: number | null
           guarantee_type: string | null
           guarantee_value: number | null
           id: string
+          internet_amount: number | null
           payment_day: number | null
           payment_method: string | null
           pre_paid: boolean | null
@@ -263,19 +268,25 @@ export type Database = {
           tenant_rg: string | null
           updated_at: string | null
           user_id: string
+          water_amount: number | null
         }
         Insert: {
           account_id?: string | null
           adjustment_index?: string | null
+          cleaning_fee?: number | null
           co_tenants?: Json | null
+          condo_fee?: number | null
           contract_number?: string | null
           created_at?: string | null
           documents?: Json | null
+          electricity_amount?: number | null
           end_date?: string | null
           extra_charges?: Json | null
+          gas_amount?: number | null
           guarantee_type?: string | null
           guarantee_value?: number | null
           id?: string
+          internet_amount?: number | null
           payment_day?: number | null
           payment_method?: string | null
           pre_paid?: boolean | null
@@ -292,19 +303,25 @@ export type Database = {
           tenant_rg?: string | null
           updated_at?: string | null
           user_id: string
+          water_amount?: number | null
         }
         Update: {
           account_id?: string | null
           adjustment_index?: string | null
+          cleaning_fee?: number | null
           co_tenants?: Json | null
+          condo_fee?: number | null
           contract_number?: string | null
           created_at?: string | null
           documents?: Json | null
+          electricity_amount?: number | null
           end_date?: string | null
           extra_charges?: Json | null
+          gas_amount?: number | null
           guarantee_type?: string | null
           guarantee_value?: number | null
           id?: string
+          internet_amount?: number | null
           payment_day?: number | null
           payment_method?: string | null
           pre_paid?: boolean | null
@@ -321,6 +338,7 @@ export type Database = {
           tenant_rg?: string | null
           updated_at?: string | null
           user_id?: string
+          water_amount?: number | null
         }
         Relationships: [
           {

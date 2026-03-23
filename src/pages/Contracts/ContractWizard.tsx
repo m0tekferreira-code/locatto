@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Check, ChevronLeft, ChevronRight, FileCheck, Shield, User, Calendar } from "lucide-react";
+import { Building2, Check, ChevronLeft, ChevronRight, DollarSign, FileCheck, Plus, Shield, Trash2, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountId } from "@/hooks/useAccountId";
 
@@ -46,7 +46,25 @@ const ContractWizard = () => {
     adjustment_index: "",
     pre_paid: false,
     
-    // Step 3: Guarantee
+    // Step 3: Cobranças padrão (defaults das faturas)
+    condo_fee: "",
+    water_amount: "",
+    electricity_amount: "",
+    gas_amount: "",
+    internet_amount: "",
+    cleaning_fee: "",
+    // Cobranças extras
+    extra_charges: [] as Array<{
+      id: string;
+      description: string;
+      charge_type: string;
+      value_per_installment: string;
+      installments: string;
+      charge_until_end: boolean;
+      start_date: string;
+    }>,
+
+    // Step 4: Guarantee
     guarantee_type: "",
     guarantee_value: "",
   });
@@ -59,7 +77,7 @@ const ContractWizard = () => {
         .from("properties")
         .select("id, name, address, status")
         .eq("account_id", accountId!)
-        .in("status", ["available", "disponivel", "vacant"])
+        .in("status", ["disponivel", "available"])
         .order("name");
       if (error) throw error;
       return data ?? [];
@@ -115,8 +133,9 @@ const ContractWizard = () => {
   const steps = [
     { number: 1, title: "Dados do Inquilino", icon: User },
     { number: 2, title: "Dados do Contrato", icon: FileCheck },
-    { number: 3, title: "Garantia", icon: Shield },
-    { number: 4, title: "Revisão", icon: Check },
+    { number: 3, title: "Cobranças", icon: DollarSign },
+    { number: 4, title: "Garantia", icon: Shield },
+    { number: 5, title: "Revisão", icon: Check },
   ];
 
   const updateFormData = (field: string, value: any) => {
@@ -147,7 +166,7 @@ const ContractWizard = () => {
       }
     }
 
-    setCurrentStep(prev => Math.min(prev + 1, 4));
+    setCurrentStep(prev => Math.min(prev + 1, 5));
   };
 
   const handlePrevious = () => {
@@ -158,7 +177,8 @@ const ContractWizard = () => {
     const resolvedPropertyId = formData.selected_property_id || propertyId || null;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from("contracts").insert({
+      // 1) Cria o contrato
+      const { data: newContract, error } = await supabase.from("contracts").insert({
         user_id: user?.id,
         account_id: accountId,
         property_id: resolvedPropertyId,
@@ -178,12 +198,85 @@ const ContractWizard = () => {
         payment_method: formData.payment_method,
         adjustment_index: formData.adjustment_index || null,
         pre_paid: formData.pre_paid,
+        condo_fee: formData.condo_fee ? parseFloat(formData.condo_fee) : null,
+        water_amount: formData.water_amount ? parseFloat(formData.water_amount) : null,
+        electricity_amount: formData.electricity_amount ? parseFloat(formData.electricity_amount) : null,
+        gas_amount: formData.gas_amount ? parseFloat(formData.gas_amount) : null,
+        internet_amount: formData.internet_amount ? parseFloat(formData.internet_amount) : null,
+        cleaning_fee: formData.cleaning_fee ? parseFloat(formData.cleaning_fee) : null,
+        extra_charges: formData.extra_charges.length > 0
+          ? formData.extra_charges.map(c => ({
+              id: c.id,
+              description: c.description,
+              charge_type: c.charge_type,
+              value_per_installment: parseFloat(c.value_per_installment) || 0,
+              installments: c.charge_until_end ? null : (parseInt(c.installments) || null),
+              charge_until_end: c.charge_until_end,
+              start_date: c.start_date || formData.start_date,
+              status: "active",
+            }))
+          : null,
         guarantee_type: formData.guarantee_type || null,
         guarantee_value: formData.guarantee_value ? parseFloat(formData.guarantee_value) : null,
         status: "active",
-      });
+      }).select("id").single();
 
       if (error) throw error;
+
+      // 2) Cria contato principal (inquilino) vinculado ao contrato e ao imóvel
+      if (newContract?.id) {
+        // Verifica se já existe contato com mesmo CPF ou email na conta
+        const { data: existing } = await supabase
+          .from("contacts")
+          .select("id")
+          .eq("account_id", accountId!)
+          .or(
+            [
+              formData.tenant_document ? `document.eq.${formData.tenant_document}` : null,
+              formData.tenant_email ? `email.eq.${formData.tenant_email}` : null,
+            ]
+              .filter(Boolean)
+              .join(",") || "id.is.null"
+          )
+          .maybeSingle();
+
+        if (!existing) {
+          await supabase.from("contacts").insert({
+            user_id: user?.id,
+            account_id: accountId,
+            name: formData.tenant_name,
+            document: formData.tenant_document || null,
+            email: formData.tenant_email || null,
+            phone: formData.tenant_phone || null,
+            contact_type: "tenant",
+            status: "active",
+            notes: [
+              formData.tenant_profession ? `Profissão: ${formData.tenant_profession}` : null,
+              formData.tenant_rg ? `RG: ${formData.tenant_rg}` : null,
+              formData.tenant_emergency_phone ? `Tel. emergência: ${formData.tenant_emergency_phone}` : null,
+              resolvedPropertyId ? `Imóvel vinculado: ${resolvedPropertyId}` : null,
+              `Contrato: ${newContract.id}`,
+            ].filter(Boolean).join(" | ") || null,
+          });
+        }
+
+        // 3) Cria contatos para os co-inquilinos
+        for (const co of formData.co_tenants) {
+          if (!co.name) continue;
+          await supabase.from("contacts").insert({
+            user_id: user?.id,
+            account_id: accountId,
+            name: co.name,
+            document: co.document || null,
+            contact_type: "tenant",
+            status: "active",
+            notes: [
+              co.relationship ? `Parentesco: ${co.relationship}` : null,
+              `Contrato: ${newContract.id}`,
+            ].filter(Boolean).join(" | ") || null,
+          });
+        }
+      }
 
       // Marca o imóvel como alugado
       if (resolvedPropertyId) {
@@ -503,7 +596,255 @@ const ContractWizard = () => {
           </div>
         );
 
-      case 3:
+      case 3: {
+        const chargeTypeLabels: Record<string, string> = {
+          condo_fee: "Condomínio",
+          iptu: "IPTU",
+          insurance: "Seguro",
+          water: "Água",
+          electricity: "Luz",
+          gas: "Gás",
+          internet: "Internet",
+          other: "Outros",
+        };
+        return (
+          <div className="space-y-6">
+            {/* Cobranças fixas padrão */}
+            <div>
+              <h4 className="font-semibold text-sm mb-3">Cobranças Fixas Mensais</h4>
+              <p className="text-xs text-muted-foreground mb-4">
+                Preencha os valores que serão pré-carregados ao gerar faturas deste contrato. Deixe em branco se não se aplica.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="condo_fee">Condomínio (R$)</Label>
+                  <Input
+                    id="condo_fee"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.condo_fee}
+                    onChange={(e) => updateFormData("condo_fee", e.target.value)}
+                    placeholder="0,00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="water_amount">Água (R$)</Label>
+                  <Input
+                    id="water_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.water_amount}
+                    onChange={(e) => updateFormData("water_amount", e.target.value)}
+                    placeholder="0,00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="electricity_amount">Luz (R$)</Label>
+                  <Input
+                    id="electricity_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.electricity_amount}
+                    onChange={(e) => updateFormData("electricity_amount", e.target.value)}
+                    placeholder="0,00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="gas_amount">Gás (R$)</Label>
+                  <Input
+                    id="gas_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.gas_amount}
+                    onChange={(e) => updateFormData("gas_amount", e.target.value)}
+                    placeholder="0,00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="internet_amount">Internet (R$)</Label>
+                  <Input
+                    id="internet_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.internet_amount}
+                    onChange={(e) => updateFormData("internet_amount", e.target.value)}
+                    placeholder="0,00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="cleaning_fee">Limpeza (R$)</Label>
+                  <Input
+                    id="cleaning_fee"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.cleaning_fee}
+                    onChange={(e) => updateFormData("cleaning_fee", e.target.value)}
+                    placeholder="0,00"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Cobranças extras personalizadas */}
+            <div className="border-t pt-4">
+              <div className="flex justify-between items-center mb-3">
+                <div>
+                  <h4 className="font-semibold text-sm">Cobranças Extras</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Adicione cobranças adicionais por prazo determinado ou até o fim do contrato.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    updateFormData("extra_charges", [
+                      ...formData.extra_charges,
+                      {
+                        id: crypto.randomUUID(),
+                        description: "",
+                        charge_type: "other",
+                        value_per_installment: "",
+                        installments: "",
+                        charge_until_end: true,
+                        start_date: formData.start_date || "",
+                      },
+                    ])
+                  }
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar
+                </Button>
+              </div>
+
+              {formData.extra_charges.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4 border rounded-lg bg-muted/30">
+                  Nenhuma cobrança extra adicionada.
+                </p>
+              )}
+
+              <div className="space-y-3">
+                {formData.extra_charges.map((charge, index) => (
+                  <div key={charge.id} className="border rounded-lg p-3 space-y-3 bg-muted/20">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        Cobrança #{index + 1}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                        onClick={() =>
+                          updateFormData(
+                            "extra_charges",
+                            formData.extra_charges.filter((_, i) => i !== index)
+                          )
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="col-span-2">
+                        <Label>Descrição</Label>
+                        <Input
+                          placeholder="Ex: IPTU, Seguro incêndio..."
+                          value={charge.description}
+                          onChange={(e) => {
+                            const updated = [...formData.extra_charges];
+                            updated[index] = { ...updated[index], description: e.target.value };
+                            updateFormData("extra_charges", updated);
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label>Tipo</Label>
+                        <Select
+                          value={charge.charge_type}
+                          onValueChange={(value) => {
+                            const updated = [...formData.extra_charges];
+                            updated[index] = { ...updated[index], charge_type: value };
+                            updateFormData("extra_charges", updated);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(chargeTypeLabels).map(([key, label]) => (
+                              <SelectItem key={key} value={key}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Valor (R$)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0,00"
+                          value={charge.value_per_installment}
+                          onChange={(e) => {
+                            const updated = [...formData.extra_charges];
+                            updated[index] = { ...updated[index], value_per_installment: e.target.value };
+                            updateFormData("extra_charges", updated);
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id={`charge_until_end_${index}`}
+                          checked={charge.charge_until_end}
+                          onCheckedChange={(checked) => {
+                            const updated = [...formData.extra_charges];
+                            updated[index] = { ...updated[index], charge_until_end: !!checked };
+                            updateFormData("extra_charges", updated);
+                          }}
+                        />
+                        <Label htmlFor={`charge_until_end_${index}`} className="cursor-pointer text-sm">
+                          Cobrar até o fim do contrato
+                        </Label>
+                      </div>
+                    </div>
+
+                    {!charge.charge_until_end && (
+                      <div className="w-1/2">
+                        <Label>Nº de Parcelas</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          placeholder="Ex: 12"
+                          value={charge.installments}
+                          onChange={(e) => {
+                            const updated = [...formData.extra_charges];
+                            updated[index] = { ...updated[index], installments: e.target.value };
+                            updateFormData("extra_charges", updated);
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      case 4:
         return (
           <div className="space-y-4">
             <div>
@@ -546,7 +887,7 @@ const ContractWizard = () => {
           </div>
         );
 
-      case 4:
+      case 5:
         return (
           <div className="space-y-6">
             <div className="rounded-lg border p-4">
@@ -672,6 +1013,70 @@ const ContractWizard = () => {
                 </div>
               </div>
             )}
+
+            {/* Cobranças na revisão */}
+            {(formData.condo_fee || formData.water_amount || formData.electricity_amount ||
+              formData.gas_amount || formData.internet_amount || formData.cleaning_fee ||
+              formData.extra_charges.length > 0) && (
+              <div className="rounded-lg border p-4">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Cobranças
+                </h3>
+                <div className="space-y-2 text-sm">
+                  {formData.condo_fee && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Condomínio:</span>
+                      <span>R$ {parseFloat(formData.condo_fee).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {formData.water_amount && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Água:</span>
+                      <span>R$ {parseFloat(formData.water_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {formData.electricity_amount && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Luz:</span>
+                      <span>R$ {parseFloat(formData.electricity_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {formData.gas_amount && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Gás:</span>
+                      <span>R$ {parseFloat(formData.gas_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {formData.internet_amount && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Internet:</span>
+                      <span>R$ {parseFloat(formData.internet_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {formData.cleaning_fee && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Limpeza:</span>
+                      <span>R$ {parseFloat(formData.cleaning_fee).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {formData.extra_charges.length > 0 && (
+                    <div className="pt-2 border-t">
+                      <span className="text-muted-foreground font-semibold block mb-1">Cobranças extras:</span>
+                      {formData.extra_charges.map((c, i) => (
+                        <div key={i} className="flex justify-between ml-2">
+                          <span className="text-muted-foreground">{c.description || `Cobrança #${i + 1}`}:</span>
+                          <span>
+                            R$ {parseFloat(c.value_per_installment || "0").toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            {c.charge_until_end ? " (até o fim)" : ` x ${c.installments}x`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -752,7 +1157,7 @@ const ContractWizard = () => {
                     Anterior
                   </Button>
 
-                  {currentStep < 4 ? (
+                  {currentStep < 5 ? (
                     <Button onClick={handleNext}>
                       Próximo
                       <ChevronRight className="ml-2 h-4 w-4" />

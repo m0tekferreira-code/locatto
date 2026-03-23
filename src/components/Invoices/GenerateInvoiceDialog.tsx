@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { CalendarIcon, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,8 @@ export function GenerateInvoiceDialog() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<string>("");
+  const [contractComboOpen, setContractComboOpen] = useState(false);
+  const [contractSearch, setContractSearch] = useState("");
   const [referenceMonth, setReferenceMonth] = useState<Date>(new Date());
 
   const { data: contracts } = useQuery({
@@ -124,7 +126,15 @@ export function GenerateInvoiceDialog() {
       }
 
       const rentalAmount = Number(contract.rental_value);
-      const totalAmount = rentalAmount + guaranteeInstallment + extraChargesTotal;
+      const condoFee = Number(contract.condo_fee ?? 0);
+      const waterAmount = Number(contract.water_amount ?? 0);
+      const electricityAmount = Number(contract.electricity_amount ?? 0);
+      const gasAmount = Number(contract.gas_amount ?? 0);
+      const internetAmount = Number(contract.internet_amount ?? 0);
+      const cleaningFee = Number(contract.cleaning_fee ?? 0);
+
+      const standardChargesTotal = condoFee + waterAmount + electricityAmount + gasAmount + internetAmount + cleaningFee;
+      const totalAmount = rentalAmount + guaranteeInstallment + extraChargesTotal + standardChargesTotal;
 
       // Gera número da fatura
       const prefix = `FAT-${format(refMonth, "yyyyMM")}`;
@@ -153,11 +163,12 @@ export function GenerateInvoiceDialog() {
           total_amount: totalAmount,
           payment_method: contract.payment_method ?? "bank_transfer",
           status: "pending",
-          water_amount: 0,
-          electricity_amount: 0,
-          gas_amount: 0,
-          internet_amount: 0,
-          condo_fee: 0,
+          condo_fee: condoFee || null,
+          water_amount: waterAmount || null,
+          electricity_amount: electricityAmount || null,
+          gas_amount: gasAmount || null,
+          internet_amount: internetAmount || null,
+          cleaning_fee: cleaningFee || null,
           extra_charges: extraCharges,
           history: [{
             action: "created",
@@ -236,18 +247,63 @@ export function GenerateInvoiceDialog() {
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="contract">Contrato</Label>
-            <Select value={selectedContract} onValueChange={setSelectedContract}>
-              <SelectTrigger id="contract">
-                <SelectValue placeholder="Selecione um contrato ativo" />
-              </SelectTrigger>
-              <SelectContent>
-                {contracts?.map((contract) => (
-                  <SelectItem key={contract.id} value={contract.id}>
-                    {contract.properties?.name || contract.properties?.address} - {contract.tenant_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={contractComboOpen} onOpenChange={setContractComboOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={contractComboOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  <span className="truncate">
+                    {selectedContract
+                      ? (() => {
+                          const c = contracts?.find(c => c.id === selectedContract);
+                          return c ? `${c.properties?.name || c.properties?.address} - ${c.tenant_name}` : "Selecione um contrato ativo";
+                        })()
+                      : "Selecione um contrato ativo"}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput
+                    placeholder="Buscar por nome ou imóvel..."
+                    value={contractSearch}
+                    onValueChange={setContractSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>Nenhum contrato encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {contracts
+                        ?.filter(c => {
+                          if (!contractSearch || contractSearch.length < 3) return true;
+                          const q = contractSearch.toLowerCase();
+                          const label = `${c.properties?.name || c.properties?.address || ""} ${c.tenant_name || ""}`.toLowerCase();
+                          return label.includes(q);
+                        })
+                        .map(contract => (
+                          <CommandItem
+                            key={contract.id}
+                            value={`${contract.properties?.name || contract.properties?.address} - ${contract.tenant_name}`}
+                            onSelect={() => {
+                              setSelectedContract(contract.id);
+                              setContractComboOpen(false);
+                              setContractSearch("");
+                            }}
+                          >
+                            <Check
+                              className={cn("mr-2 h-4 w-4", selectedContract === contract.id ? "opacity-100" : "opacity-0")}
+                            />
+                            {contract.properties?.name || contract.properties?.address} - {contract.tenant_name}
+                          </CommandItem>
+                        ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="space-y-2">
