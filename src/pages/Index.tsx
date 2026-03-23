@@ -37,6 +37,7 @@ const Index = () => {
   const { data: propertySummary, isLoading: propertySummaryLoading } = usePropertySummary(user?.id, accountId);
 
   return (
+    <>
     <AppLayout title="Dashboard">
       {/* Row 1: Contract Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -154,9 +155,10 @@ const Index = () => {
       </div>
     </AppLayout>
 
-    <InflacaoCalculatorDialog open={inflacaoOpen} onOpenChange={setInflacaoOpen} />
-    <JurosMultaCalculatorDialog open={jurosOpen} onOpenChange={setJurosOpen} />
-    <FinanciamentoCalculatorDialog open={financiamentoOpen} onOpenChange={setFinanciamentoOpen} />
+      <InflacaoCalculatorDialog open={inflacaoOpen} onOpenChange={setInflacaoOpen} />
+      <JurosMultaCalculatorDialog open={jurosOpen} onOpenChange={setJurosOpen} />
+      <FinanciamentoCalculatorDialog open={financiamentoOpen} onOpenChange={setFinanciamentoOpen} />
+    </>
   );
 };
 
