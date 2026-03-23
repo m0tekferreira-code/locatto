@@ -17,8 +17,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Invoice {
   id: string;
-  contract?: { tenant_name: string };
-  property?: { name: string };
+  contract?: { tenant_name: string; property?: { name: string } | null };
+  property?: { name: string } | null;
   due_date: string;
   total_amount: number;
   status: string;
@@ -146,7 +146,7 @@ export const InvoicesTable = ({ invoices }: InvoicesTableProps) => {
                       invoices.map((invoice) => (
                         <TableRow key={invoice.id}>
                           <TableCell className="font-medium">{invoice.contract?.tenant_name || "N/A"}</TableCell>
-                          <TableCell className="max-w-xs truncate">{invoice.property?.name || "N/A"}</TableCell>
+                          <TableCell className="max-w-xs truncate">{invoice.property?.name || invoice.contract?.property?.name || "N/A"}</TableCell>
                           <TableCell>{format(new Date(invoice.due_date), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                           <TableCell className="font-semibold">
                             {Number(invoice.total_amount || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}

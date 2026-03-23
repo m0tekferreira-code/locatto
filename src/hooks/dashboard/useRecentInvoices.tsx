@@ -15,7 +15,7 @@ export const useRecentInvoices = (userId: string | undefined, accountId: string 
         .select(`
           *,
           property:properties(name),
-          contract:contracts(tenant_name)
+          contract:contracts(tenant_name, property:properties(name))
         `)
         .eq(filterColumn, filterValue)
         .order("created_at", { ascending: false })
