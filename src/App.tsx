@@ -32,6 +32,8 @@ import LicenseManagement from "./pages/Admin/LicenseManagement";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminAccounts from "./pages/Admin/AdminAccounts";
 import AdminPayments from "./pages/Admin/AdminPayments";
+import AdminUsers from "./pages/Admin/AdminUsers";
+import AdminPlans from "./pages/Admin/AdminPlans";
 import NotificationSettings from "./pages/Notifications/NotificationSettings";
 import FinancialDashboard from "./pages/Financial/FinancialDashboard";
 import BaixaPagamentos from "./pages/Financial/BaixaPagamentos";
@@ -209,6 +211,20 @@ const App = () => (
               <ProtectedRoute>
                 <SuperAdminRoute>
                   <AdminPayments />
+                </SuperAdminRoute>
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/users" element={
+              <ProtectedRoute>
+                <SuperAdminRoute>
+                  <AdminUsers />
+                </SuperAdminRoute>
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/plans" element={
+              <ProtectedRoute>
+                <SuperAdminRoute>
+                  <AdminPlans />
                 </SuperAdminRoute>
               </ProtectedRoute>
             } />

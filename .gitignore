@@ -41,3 +41,7 @@ APPLY_THIS_FIX_NOW.sql.backup
 *.pem
 *.key
 *-credentials.json
+
+# One-time setup scripts (self-destruct)
+create-super-admin.mjs
+.env.superadmin

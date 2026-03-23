@@ -20,7 +20,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, MoreVertical, RefreshCw, Ban, CheckCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Search, MoreVertical, RefreshCw, Ban, CheckCircle, CreditCard } from "lucide-react";
 
 interface Account {
   id: string;
@@ -33,20 +49,40 @@ interface Account {
   owner_email?: string;
 }
 
+interface BillingPlan {
+  id: string;
+  name: string;
+  price_cents: number;
+  days_duration: number;
+}
+
 const AdminAccounts = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [filteredAccounts, setFilteredAccounts] = useState<Account[]>([]);
+  const [plans, setPlans] = useState<BillingPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<string>("");
+  const [savingPlan, setSavingPlan] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchAccounts();
+    fetchPlans();
   }, []);
 
   useEffect(() => {
     filterAccounts();
   }, [searchTerm, accounts]);
+
+  const fetchPlans = async () => {
+    const { data, error } = await supabase
+      .from('billing_plans')
+      .select('id, name, price_cents, days_duration')
+      .order('price_cents');
+    if (!error && data) setPlans(data);
+  };
 
   const fetchAccounts = async () => {
     try {
@@ -131,6 +167,37 @@ const AdminAccounts = () => {
         description: "Não foi possível estender a licença.",
         variant: "destructive",
       });
+    }
+  };
+
+  const openEditPlan = (account: Account) => {
+    setEditingAccount(account);
+    setSelectedPlan(account.plan_id || "");
+  };
+
+  const handleSavePlan = async () => {
+    if (!editingAccount) return;
+    setSavingPlan(true);
+    try {
+      const { error } = await supabase
+        .from('accounts')
+        .update({ plan_id: selectedPlan || null })
+        .eq('id', editingAccount.id);
+
+      if (error) throw error;
+
+      toast({ title: "Plano atualizado", description: "O plano da conta foi alterado." });
+      setEditingAccount(null);
+      fetchAccounts();
+    } catch (error) {
+      console.error('Error updating plan:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível alterar o plano.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPlan(false);
     }
   };
 
@@ -278,6 +345,10 @@ const AdminAccounts = () => {
                                 <CheckCircle className="mr-2 h-4 w-4" />
                                 Estender 1 ano
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditPlan(account)}>
+                                <CreditCard className="mr-2 h-4 w-4" />
+                                Alterar Plano
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => revokeLicense(account.id)}
                                 className="text-destructive"
@@ -297,6 +368,40 @@ const AdminAccounts = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Plan Dialog */}
+      <Dialog open={!!editingAccount} onOpenChange={(open) => !open && setEditingAccount(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Plano</DialogTitle>
+            <DialogDescription>
+              Altere o plano da conta <strong>{editingAccount?.account_name}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-2">
+            <Label htmlFor="account-plan-select">Plano</Label>
+            <Select value={selectedPlan} onValueChange={setSelectedPlan}>
+              <SelectTrigger id="account-plan-select">
+                <SelectValue placeholder="Selecionar plano..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Sem plano</SelectItem>
+                {plans.map((plan) => (
+                  <SelectItem key={plan.id} value={plan.id}>
+                    {plan.name} — R$ {(plan.price_cents / 100).toFixed(2)} / {plan.days_duration} dias
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingAccount(null)}>Cancelar</Button>
+            <Button onClick={handleSavePlan} disabled={savingPlan}>
+              {savingPlan ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };

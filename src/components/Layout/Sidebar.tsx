@@ -201,6 +201,20 @@ export const Sidebar = () => {
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild isActive={location.pathname === "/admin/users"}>
+                          <Link to="/admin/users">
+                            <span className="text-sm">Usuários Admin</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild isActive={location.pathname === "/admin/plans"}>
+                          <Link to="/admin/plans">
+                            <span className="text-sm">Planos</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
                     </CollapsibleContent>
                   )}
                 </Collapsible>
