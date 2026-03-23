@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/Layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,36 @@ const ContractWizard = () => {
     guarantee_type: "",
     guarantee_value: "",
   });
+
+  // Busca o próximo número de contrato disponível para a conta
+  const { data: nextContractNumber } = useQuery({
+    queryKey: ["next-contract-number", accountId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("contracts")
+        .select("contract_number")
+        .eq("account_id", accountId!)
+        .not("contract_number", "is", null);
+
+      if (!data || data.length === 0) return "1";
+
+      const max = data.reduce((acc, c) => {
+        const num = parseInt(c.contract_number ?? "0", 10);
+        return isNaN(num) ? acc : Math.max(acc, num);
+      }, 0);
+
+      return (max + 1).toString();
+    },
+    enabled: !!accountId,
+  });
+
+  // Pré-preenche o número quando o próximo número é carregado e o campo ainda está vazio
+  useEffect(() => {
+    if (nextContractNumber && formData.contract_number === "") {
+      updateFormData("contract_number", nextContractNumber);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextContractNumber]);
 
   const { data: property } = useQuery({
     queryKey: ["property", propertyId],
@@ -313,8 +343,11 @@ const ContractWizard = () => {
                 id="contract_number"
                 value={formData.contract_number}
                 onChange={(e) => updateFormData("contract_number", e.target.value)}
-                placeholder="Número ou identificação do contrato"
+                placeholder={nextContractNumber ? `Próximo disponível: ${nextContractNumber}` : "Gerado automaticamente"}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Preenchido automaticamente. Você pode alterá-lo se necessário.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
