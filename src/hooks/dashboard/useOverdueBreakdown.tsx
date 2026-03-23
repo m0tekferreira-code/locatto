@@ -29,6 +29,8 @@ export const useOverdueBreakdown = (userId: string | undefined, accountId: strin
       const filterColumn = accountId ? "account_id" : "user_id";
       const filterValue = accountId || userId;
 
+      const todayStr = new Date().toISOString().split("T")[0];
+
       const { data, error } = await supabase
         .from("invoices")
         .select(`
@@ -46,7 +48,8 @@ export const useOverdueBreakdown = (userId: string | undefined, accountId: strin
           property:properties(name)
         `)
         .eq(filterColumn, filterValue)
-        .eq("status", "overdue")
+        .in("status", ["pending", "overdue", "late"])
+        .lt("due_date", todayStr)
         .order("due_date", { ascending: true });
 
       if (error) throw error;
