@@ -128,7 +128,10 @@ const ContractsList = () => {
       result = result.filter(
         (c) =>
           c.tenant_name.toLowerCase().includes(term) ||
-          c.properties?.name?.toLowerCase().includes(term)
+          c.properties?.name?.toLowerCase().includes(term) ||
+          c.contract_number?.toLowerCase().includes(term) ||
+          c.tenant_document?.toLowerCase().includes(term) ||
+          c.tenant_phone?.toLowerCase().includes(term)
       );
     }
 

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Check, ChevronLeft, ChevronRight, FileCheck, Shield, User, Calendar } from "lucide-react";
+import { Building2, Check, ChevronLeft, ChevronRight, FileCheck, Shield, User, Calendar } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountId } from "@/hooks/useAccountId";
 
@@ -36,6 +36,7 @@ const ContractWizard = () => {
     co_tenants: [] as Array<{ name: string; document: string; relationship: string }>,
     
     // Step 2: Contract data
+    selected_property_id: propertyId ?? "",
     contract_number: "",
     start_date: "",
     end_date: "",
@@ -48,6 +49,22 @@ const ContractWizard = () => {
     // Step 3: Guarantee
     guarantee_type: "",
     guarantee_value: "",
+  });
+
+  // Busca os imóveis disponíveis da conta (não alugados)
+  const { data: availableProperties } = useQuery({
+    queryKey: ["available-properties", accountId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("id, name, address, status")
+        .eq("account_id", accountId!)
+        .in("status", ["available", "disponivel", "vacant"])
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!accountId && !propertyId,
   });
 
   // Busca o próximo número de contrato disponível para a conta
@@ -138,12 +155,13 @@ const ContractWizard = () => {
   };
 
   const handleSubmit = async () => {
+    const resolvedPropertyId = formData.selected_property_id || propertyId || null;
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from("contracts").insert({
         user_id: user?.id,
         account_id: accountId,
-        property_id: propertyId,
+        property_id: resolvedPropertyId,
         tenant_name: formData.tenant_name,
         tenant_document: formData.tenant_document || null,
         tenant_rg: formData.tenant_rg || null,
@@ -167,12 +185,12 @@ const ContractWizard = () => {
 
       if (error) throw error;
 
-      // Update property status to rented only when coming from a property
-      if (propertyId) {
+      // Marca o imóvel como alugado
+      if (resolvedPropertyId) {
         await supabase
           .from("properties")
           .update({ status: "rented" })
-          .eq("id", propertyId);
+          .eq("id", resolvedPropertyId);
       }
 
       toast({
@@ -180,7 +198,7 @@ const ContractWizard = () => {
         description: "Contrato criado com sucesso",
       });
 
-      navigate(propertyId ? `/imoveis/${propertyId}` : "/contratos");
+      navigate(resolvedPropertyId ? `/imoveis/${resolvedPropertyId}` : "/contratos");
     } catch (error: any) {
       toast({
         title: "Erro ao criar contrato",
@@ -337,6 +355,46 @@ const ContractWizard = () => {
       case 2:
         return (
           <div className="space-y-4">
+            {/* Seletor de imóvel — exibido apenas quando veio de /contratos/novo sem propertyId */}
+            {!propertyId && (
+              <div>
+                <Label htmlFor="selected_property_id" className="flex items-center gap-1">
+                  <Building2 className="h-4 w-4" />
+                  Imóvel *
+                </Label>
+                <Select
+                  value={formData.selected_property_id}
+                  onValueChange={(value) => updateFormData("selected_property_id", value)}
+                >
+                  <SelectTrigger id="selected_property_id">
+                    <SelectValue placeholder="Selecione o imóvel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableProperties && availableProperties.length > 0 ? (
+                      availableProperties.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}{p.address ? ` — ${p.address}` : ""}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        Nenhum imóvel disponível
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {/* Imóvel fixo vindo da URL */}
+            {propertyId && property && (
+              <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-4 py-3">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Imóvel</p>
+                  <p className="font-medium">{property.name}</p>
+                </div>
+              </div>
+            )}
             <div>
               <Label htmlFor="contract_number">Número do Contrato</Label>
               <Input
@@ -554,12 +612,17 @@ const ContractWizard = () => {
                 Dados do Contrato
               </h3>
               <div className="space-y-2 text-sm">
-                {property?.name && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Imóvel:</span>
-                    <span className="font-medium">{property.name}</span>
-                  </div>
-                )}
+                {(() => {
+                  const selectedProp = propertyId
+                    ? property
+                    : availableProperties?.find((p) => p.id === formData.selected_property_id);
+                  return selectedProp ? (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Imóvel:</span>
+                      <span className="font-medium">{selectedProp.name}</span>
+                    </div>
+                  ) : null;
+                })()}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Início:</span>
                   <span className="font-medium">

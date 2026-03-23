@@ -144,7 +144,9 @@ const InvoicesList = () => {
 
     const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
     const matchesPaymentMethod = paymentMethodFilter === "all" || invoice.payment_method === paymentMethodFilter;
-    const matchesContract = !contractFilter || invoice.contracts?.contract_number?.toLowerCase().includes(contractFilter.toLowerCase());
+    const matchesContract = !contractFilter || 
+      invoice.contracts?.contract_number?.toLowerCase().includes(contractFilter.toLowerCase()) ||
+      invoice.contracts?.tenant_name?.toLowerCase().includes(contractFilter.toLowerCase());
     const matchesOwner = !ownerFilter || invoice.properties?.owner_name?.toLowerCase().includes(ownerFilter.toLowerCase());
 
     // Date range filter
@@ -191,7 +193,9 @@ const InvoicesList = () => {
       invoice.contracts?.contract_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       invoice.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPaymentMethod = paymentMethodFilter === "all" || invoice.payment_method === paymentMethodFilter;
-    const matchesContract = !contractFilter || invoice.contracts?.contract_number?.toLowerCase().includes(contractFilter.toLowerCase());
+    const matchesContract = !contractFilter || 
+      invoice.contracts?.contract_number?.toLowerCase().includes(contractFilter.toLowerCase()) ||
+      invoice.contracts?.tenant_name?.toLowerCase().includes(contractFilter.toLowerCase());
     const matchesOwner = !ownerFilter || invoice.properties?.owner_name?.toLowerCase().includes(ownerFilter.toLowerCase());
     
     if (matchesSearch && matchesPaymentMethod && matchesContract && matchesOwner) {
@@ -428,10 +432,10 @@ const InvoicesList = () => {
               </Select>
 
               <Input
-                placeholder="Filtrar por contrato..."
+                placeholder="Filtrar por nº contrato ou inquilino..."
                 value={contractFilter}
                 onChange={(e) => setContractFilter(e.target.value)}
-                className="w-full md:w-[200px]"
+                className="w-full md:w-[220px]"
               />
 
               <Input
@@ -477,7 +481,7 @@ const InvoicesList = () => {
               </Select>
 
               <Input
-                placeholder="Filtrar por contrato..."
+                placeholder="Filtrar por nº contrato ou inquilino..."
                 value={contractFilter}
                 onChange={(e) => setContractFilter(e.target.value)}
                 className="w-full"
