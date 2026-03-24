@@ -1,7 +1,7 @@
 import * as React from "react";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subWeeks, subMonths, subYears } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, subWeeks, subMonths, subYears, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar as CalendarIcon, X } from "lucide-react";
+import { Calendar as CalendarIcon, X, ChevronDown } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 
 export type DateFilterField = "due_date" | "reference_month" | "payment_date";
 
@@ -36,63 +37,92 @@ const FIELD_LABELS: Record<DateFilterField, string> = {
   payment_date: "Dt. Pagamento",
 };
 
-type PresetKey = 
-  | "today" 
-  | "yesterday" 
-  | "thisWeek" 
-  | "lastWeek" 
-  | "last7Days" 
-  | "thisMonth" 
-  | "lastMonth" 
-  | "thisYear" 
+type PresetKey =
+  | "today"
+  | "yesterday"
+  | "thisWeek"
+  | "lastWeek"
+  | "last7Days"
+  | "thisMonth"
+  | "lastMonth"
+  | "thisYear"
   | "lastYear";
 
-const PRESETS: { key: PresetKey; label: string }[] = [
-  { key: "today", label: "Hoje" },
-  { key: "yesterday", label: "Ontem" },
-  { key: "thisWeek", label: "Esta semana" },
-  { key: "lastWeek", label: "Semana Passada" },
-  { key: "last7Days", label: "Últimos 7 Dias" },
-  { key: "thisMonth", label: "Este Mês" },
-  { key: "lastMonth", label: "Mês Passado" },
-  { key: "thisYear", label: "Este Ano" },
-  { key: "lastYear", label: "Ano Passado" },
+const PRESET_GROUPS: { label: string; items: { key: PresetKey; label: string }[] }[] = [
+  {
+    label: "Dias",
+    items: [
+      { key: "today", label: "Hoje" },
+      { key: "yesterday", label: "Ontem" },
+      { key: "last7Days", label: "Últimos 7 dias" },
+    ],
+  },
+  {
+    label: "Semanas",
+    items: [
+      { key: "thisWeek", label: "Esta semana" },
+      { key: "lastWeek", label: "Semana passada" },
+    ],
+  },
+  {
+    label: "Meses",
+    items: [
+      { key: "thisMonth", label: "Este mês" },
+      { key: "lastMonth", label: "Mês passado" },
+    ],
+  },
+  {
+    label: "Anos",
+    items: [
+      { key: "thisYear", label: "Este ano" },
+      { key: "lastYear", label: "Ano passado" },
+    ],
+  },
 ];
 
 function getPresetRange(preset: PresetKey): DateRange {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   switch (preset) {
     case "today":
       return { from: today, to: today };
     case "yesterday": {
-      const yesterday = subDays(today, 1);
-      return { from: yesterday, to: yesterday };
+      const y = subDays(today, 1);
+      return { from: y, to: y };
     }
     case "thisWeek":
       return { from: startOfWeek(today, { locale: ptBR }), to: endOfWeek(today, { locale: ptBR }) };
     case "lastWeek": {
-      const lastWeekStart = startOfWeek(subWeeks(today, 1), { locale: ptBR });
-      return { from: lastWeekStart, to: endOfWeek(lastWeekStart, { locale: ptBR }) };
+      const s = startOfWeek(subWeeks(today, 1), { locale: ptBR });
+      return { from: s, to: endOfWeek(s, { locale: ptBR }) };
     }
     case "last7Days":
       return { from: subDays(today, 6), to: today };
     case "thisMonth":
       return { from: startOfMonth(today), to: endOfMonth(today) };
     case "lastMonth": {
-      const lastMonthStart = startOfMonth(subMonths(today, 1));
-      return { from: lastMonthStart, to: endOfMonth(lastMonthStart) };
+      const s = startOfMonth(subMonths(today, 1));
+      return { from: s, to: endOfMonth(s) };
     }
     case "thisYear":
       return { from: startOfYear(today), to: endOfYear(today) };
     case "lastYear": {
-      const lastYearStart = startOfYear(subYears(today, 1));
-      return { from: lastYearStart, to: endOfYear(lastYearStart) };
+      const s = startOfYear(subYears(today, 1));
+      return { from: s, to: endOfYear(s) };
     }
     default:
       return { from: today, to: today };
   }
+}
+
+function isPresetActive(preset: PresetKey, dateRange: DateRange | undefined): boolean {
+  if (!dateRange?.from) return false;
+  const range = getPresetRange(preset);
+  return (
+    isSameDay(range.from, dateRange.from) &&
+    !!range.to && !!dateRange.to && isSameDay(range.to, dateRange.to)
+  );
 }
 
 export function DateRangePicker({
@@ -111,20 +141,24 @@ export function DateRangePicker({
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDateRangeChange(undefined);
+    setOpen(false);
   };
 
   const formatDateRange = () => {
     if (!dateRange?.from) return null;
-    if (!dateRange.to) return format(dateRange.from, "dd/MM/yyyy", { locale: ptBR });
-    return `${format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} -- ${format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}`;
+    if (!dateRange.to || isSameDay(dateRange.from, dateRange.to))
+      return format(dateRange.from, "dd/MM/yyyy", { locale: ptBR });
+    return `${format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} – ${format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}`;
   };
 
+  const hasValue = !!dateRange?.from;
+
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("flex items-center gap-1.5", className)}>
       {/* Date Field Selector */}
       <Select value={dateField} onValueChange={(value) => onDateFieldChange(value as DateFilterField)}>
-        <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="Filtro por data" />
+        <SelectTrigger className="w-[150px] h-9 text-sm">
+          <SelectValue placeholder="Tipo de data" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="due_date">{FIELD_LABELS.due_date}</SelectItem>
@@ -139,141 +173,113 @@ export function DateRangePicker({
           <Button
             variant="outline"
             className={cn(
-              "w-[260px] justify-start text-left font-normal",
-              !dateRange && "text-muted-foreground"
+              "h-9 justify-start text-left font-normal gap-2 min-w-[200px]",
+              hasValue
+                ? "border-primary/60 bg-primary/5 text-foreground"
+                : "text-muted-foreground"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {formatDateRange() || "Selecione o período"}
+            <CalendarIcon className={cn("h-4 w-4 shrink-0", hasValue ? "text-primary" : "text-muted-foreground")} />
+            <span className="flex-1 truncate text-sm">
+              {formatDateRange() || "Selecione o período"}
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <div className="flex">
-            {/* Presets */}
-            <div className="border-r p-3 space-y-1">
-              {PRESETS.map((preset) => (
-                <Button
-                  key={preset.key}
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start font-normal"
-                  onClick={() => handlePresetClick(preset.key)}
-                >
-                  {preset.label}
-                </Button>
+
+        <PopoverContent className="w-auto p-0 shadow-lg border" align="start">
+          <div className="flex divide-x">
+            {/* Presets Panel */}
+            <div className="w-44 py-3 flex flex-col gap-0.5">
+              <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Atalhos
+              </p>
+              {PRESET_GROUPS.map((group, gi) => (
+                <React.Fragment key={group.label}>
+                  {gi > 0 && <Separator className="my-1 mx-3" />}
+                  <div className="px-2 space-y-0.5">
+                    <p className="px-1 text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wide">
+                      {group.label}
+                    </p>
+                    {group.items.map((preset) => {
+                      const active = isPresetActive(preset.key, dateRange);
+                      return (
+                        <button
+                          key={preset.key}
+                          onClick={() => handlePresetClick(preset.key)}
+                          className={cn(
+                            "w-full text-left text-sm px-2 py-1.5 rounded-md transition-colors",
+                            active
+                              ? "bg-primary text-primary-foreground font-medium"
+                              : "hover:bg-muted text-foreground"
+                          )}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </React.Fragment>
               ))}
             </div>
-            
-            {/* Calendar */}
-            <div className="p-3">
-              {/* Month/Year selectors */}
-              <div className="flex gap-4 mb-2 justify-center">
-                <MonthYearSelector
-                  date={dateRange?.from || new Date()}
-                  onChange={(date) => {
-                    onDateRangeChange({
-                      from: date,
-                      to: dateRange?.to,
-                    });
-                  }}
-                />
-                <MonthYearSelector
-                  date={dateRange?.to || new Date()}
-                  onChange={(date) => {
-                    onDateRangeChange({
-                      from: dateRange?.from,
-                      to: date,
-                    });
-                  }}
+
+            {/* Calendar Panel */}
+            <div className="flex flex-col">
+              <div className="p-3">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange?.from}
+                  selected={dateRange}
+                  onSelect={onDateRangeChange}
+                  numberOfMonths={2}
+                  locale={ptBR}
+                  className="rounded-none"
                 />
               </div>
-              
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={dateRange?.from}
-                selected={dateRange}
-                onSelect={onDateRangeChange}
-                numberOfMonths={2}
-                locale={ptBR}
-              />
+
+              {/* Footer */}
+              <div className="border-t px-4 py-2.5 flex items-center justify-between bg-muted/30">
+                <span className="text-xs text-muted-foreground">
+                  {hasValue ? formatDateRange() : "Selecione uma data ou período"}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={handleClear}
+                    disabled={!hasValue}
+                  >
+                    Limpar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setOpen(false)}
+                    disabled={!hasValue}
+                  >
+                    Aplicar
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </PopoverContent>
       </Popover>
 
-      {/* Clear Button */}
-      {dateRange && (
+      {/* Inline Clear */}
+      {hasValue && (
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9"
+          className="h-9 w-9 text-muted-foreground hover:text-destructive"
           onClick={handleClear}
+          title="Limpar filtro de data"
         >
           <X className="h-4 w-4" />
         </Button>
       )}
-    </div>
-  );
-}
-
-// Month/Year selector component
-function MonthYearSelector({ 
-  date, 
-  onChange 
-}: { 
-  date: Date; 
-  onChange: (date: Date) => void;
-}) {
-  const months = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-  ];
-  
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
-
-  return (
-    <div className="flex gap-1">
-      <Select 
-        value={date.getMonth().toString()} 
-        onValueChange={(value) => {
-          const newDate = new Date(date);
-          newDate.setMonth(parseInt(value));
-          onChange(newDate);
-        }}
-      >
-        <SelectTrigger className="w-[110px] h-8 text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {months.map((month, index) => (
-            <SelectItem key={index} value={index.toString()}>
-              {month}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      
-      <Select 
-        value={date.getFullYear().toString()} 
-        onValueChange={(value) => {
-          const newDate = new Date(date);
-          newDate.setFullYear(parseInt(value));
-          onChange(newDate);
-        }}
-      >
-        <SelectTrigger className="w-[80px] h-8 text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {years.map((year) => (
-            <SelectItem key={year} value={year.toString()}>
-              {year}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
     </div>
   );
 }
