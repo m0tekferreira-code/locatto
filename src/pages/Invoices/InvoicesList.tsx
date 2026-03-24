@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Receipt, DollarSign, AlertCircle, Zap, Calendar as CalendarIcon, FileSpreadsheet, Mail, MessageCircle, Copy, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { Plus, Search, Receipt, DollarSign, AlertCircle, Zap, Calendar as CalendarIcon, FileSpreadsheet, Mail, MessageCircle, Copy, ChevronLeft, ChevronRight, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { InvoiceCard } from "@/components/Responsive/InvoiceCard";
@@ -50,6 +50,9 @@ const InvoicesList = () => {
   const [dateField, setDateField] = useState<DateFilterField>("due_date");
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [itemsPerPage, setItemsPerPage] = useState(100);
+  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
+  const [cleanupPreview, setCleanupPreview] = useState<any[]>([]);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
 
   const filterColumn = accountId ? "account_id" : "user_id";
   const filterValue = accountId || user?.id;
@@ -100,6 +103,96 @@ const InvoicesList = () => {
       return count || 0;
     },
     enabled: !!user?.id && !accountLoading,
+  });
+
+  const deleteSelectedMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from("invoices")
+        .delete()
+        .in("id", ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      setSelectedInvoices([]);
+      toast({
+        title: `${count} fatura(s) excluída(s)`,
+        description: "As faturas selecionadas foram removidas permanentemente.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao excluir faturas",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const loadCleanupPreview = async () => {
+    setCleanupLoading(true);
+    try {
+      // Busca faturas que não possuem contrato ativo
+      const { data, error } = await supabase
+        .from("invoices")
+        .select(`
+          id, invoice_number, reference_month, due_date, total_amount, status,
+          contracts (id, contract_number, tenant_name, status)
+        `)
+        .eq(filterColumn, filterValue)
+        .order("due_date", { ascending: true });
+
+      if (error) throw error;
+
+      const orphans = (data || []).filter((inv: any) => {
+        const contractStatus = inv.contracts?.status;
+        // Inclui: sem contrato, ou contrato encerrado/expirado/cancelado
+        return !contractStatus || 
+          contractStatus === "terminated" ||
+          contractStatus === "expired" ||
+          contractStatus === "encerrado";
+      });
+
+      setCleanupPreview(orphans);
+      setCleanupDialogOpen(true);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao carregar prévia",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  const deleteCleanupMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from("invoices")
+        .delete()
+        .in("id", ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      setCleanupDialogOpen(false);
+      setCleanupPreview([]);
+      toast({
+        title: `Limpeza concluída`,
+        description: `${count} fatura(s) antiga(s) excluída(s) com sucesso.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao excluir faturas",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    },
   });
 
   const generateAllMutation = useMutation({
@@ -402,6 +495,20 @@ const InvoicesList = () => {
                 Ajustar Faturas
               </Button>
 
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    onClick={loadCleanupPreview}
+                    disabled={cleanupLoading}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {cleanupLoading ? "Analisando..." : "Limpeza de Faturas"}
+                  </Button>
+                </AlertDialogTrigger>
+              </AlertDialog>
+
               <Link to="/faturas/nova">
                 <Button className="w-full md:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
@@ -495,6 +602,39 @@ const InvoicesList = () => {
               />
             </FilterDrawer>
           </div>
+
+          {/* Bulk delete bar */}
+          {selectedInvoices.length > 0 && (
+            <div className="flex items-center justify-between bg-muted border rounded-lg px-4 py-2 mb-4">
+              <span className="text-sm font-medium">{selectedInvoices.length} fatura(s) selecionada(s)</span>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir Selecionadas
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir {selectedInvoices.length} fatura(s)?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação é permanente e não pode ser desfeita. As faturas excluídas não poderão ser recuperadas.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive hover:bg-destructive/90"
+                      onClick={() => deleteSelectedMutation.mutate(selectedInvoices)}
+                      disabled={deleteSelectedMutation.isPending}
+                    >
+                      {deleteSelectedMutation.isPending ? "Excluindo..." : "Confirmar Exclusão"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
 
           {/* Invoices Display */}
           {isLoading ? (
@@ -783,6 +923,67 @@ const InvoicesList = () => {
             open={ajustarDialogOpen}
             onOpenChange={setAjustarDialogOpen}
           />
+
+          {/* Cleanup Dialog */}
+          <AlertDialog open={cleanupDialogOpen} onOpenChange={setCleanupDialogOpen}>
+            <AlertDialogContent className="max-w-2xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <Trash2 className="h-5 w-5 text-destructive" />
+                  Limpeza de Faturas Antigas
+                </AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-3">
+                    <p>
+                      Foram encontradas <strong>{cleanupPreview.length}</strong> fatura(s) vinculadas a contratos encerrados ou sem contrato ativo.
+                    </p>
+                    {cleanupPreview.length > 0 ? (
+                      <div className="max-h-64 overflow-y-auto border rounded-lg divide-y text-sm">
+                        {cleanupPreview.map((inv) => (
+                          <div key={inv.id} className="flex items-center justify-between px-3 py-2">
+                            <div>
+                              <span className="font-medium">{inv.invoice_number || "Sem número"}</span>
+                              <span className="text-muted-foreground ml-2">
+                                {inv.contracts?.tenant_name || "Sem inquilino"}
+                                {inv.contracts?.status && (
+                                  <span className="ml-1 text-xs">({inv.contracts.status})</span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="text-right text-muted-foreground text-xs">
+                              <div>{format(new Date(inv.reference_month), "MM/yyyy")}</div>
+                              <div>R$ {Number(inv.total_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-green-600 font-medium">Nenhuma fatura órfã encontrada. Tudo limpo!</p>
+                    )}
+                    {cleanupPreview.length > 0 && (
+                      <p className="text-destructive text-sm font-medium">
+                        Esta ação é permanente e não pode ser desfeita.
+                      </p>
+                    )}
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Fechar</AlertDialogCancel>
+                {cleanupPreview.length > 0 && (
+                  <AlertDialogAction
+                    className="bg-destructive hover:bg-destructive/90"
+                    onClick={() => deleteCleanupMutation.mutate(cleanupPreview.map(inv => inv.id))}
+                    disabled={deleteCleanupMutation.isPending}
+                  >
+                    {deleteCleanupMutation.isPending
+                      ? "Excluindo..."
+                      : `Excluir ${cleanupPreview.length} fatura(s)`}
+                  </AlertDialogAction>
+                )}
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
     </AppLayout>
   );
 };
