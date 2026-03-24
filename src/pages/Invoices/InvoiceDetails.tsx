@@ -156,6 +156,42 @@ const InvoiceDetails = () => {
     },
   });
 
+  const reactivateInvoiceMutation = useMutation({
+    mutationFn: async () => {
+      const currentHistory = Array.isArray(invoice?.history) ? invoice.history : [];
+      const { error } = await supabase
+        .from("invoices")
+        .update({
+          status: "pending",
+          history: [
+            ...currentHistory,
+            {
+              action: 'reactivated',
+              timestamp: new Date().toISOString(),
+              user_id: user?.id
+            }
+          ]
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      toast({
+        title: "Fatura reativada",
+        description: "A fatura voltou ao status Pendente.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao reativar fatura",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (isLoading) {
     return (
       <AppLayout title="Detalhes da Fatura">
@@ -204,10 +240,21 @@ const InvoiceDetails = () => {
                 <Button
                   variant="outline"
                   onClick={() => setEditDialogOpen(true)}
+                  disabled={invoice.status === "cancelled"}
                 >
                   <Pencil className="mr-2 h-4 w-4" />
                   Editar
                 </Button>
+                {invoice.status === "cancelled" && (
+                  <Button
+                    variant="outline"
+                    onClick={() => reactivateInvoiceMutation.mutate()}
+                    disabled={reactivateInvoiceMutation.isPending}
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Reativar Fatura
+                  </Button>
+                )}
                 {(invoice.status === "pending" || invoice.status === "overdue") && (
                   <>
                     <Button

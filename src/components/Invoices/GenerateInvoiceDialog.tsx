@@ -64,12 +64,13 @@ export function GenerateInvoiceDialog() {
       );
       const referenceMonthStr = format(refMonth, "yyyy-MM-dd");
 
-      // Verifica se já existe fatura para este contrato/mês
+      // Verifica se já existe fatura ATIVA para este contrato/mês
       const { data: existing } = await supabase
         .from("invoices")
         .select("id")
         .eq("contract_id", contract.id)
         .eq("reference_month", referenceMonthStr)
+        .neq("status", "cancelled")
         .maybeSingle();
 
       if (existing) throw new Error("Já existe uma fatura para este contrato neste mês.");

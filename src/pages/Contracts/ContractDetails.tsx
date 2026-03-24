@@ -17,7 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ArrowLeft, Building2, FileText, Download, AlertCircle, Plus, Edit, Upload, Trash2, Link2 } from "lucide-react";
+import { ArrowLeft, Building2, FileText, Download, AlertCircle, Plus, Edit, Upload, Trash2, Link2, Scale, XCircle, RefreshCw } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -45,18 +46,35 @@ interface Contract {
   co_tenants: any;
   property_id: string;
   extra_charges?: any[];
+  water_amount: number | null;
+  electricity_amount: number | null;
+  gas_amount: number | null;
+  internet_amount: number | null;
+  condo_fee: number | null;
+  cleaning_fee: number | null;
 }
 
 interface Property {
   id: string;
   name: string;
   address: string;
+  number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
   city: string;
   state: string;
+  postal_code: string | null;
+  country: string | null;
   property_type: string;
+  classification: string | null;
+  transaction_type: string | null;
   status: string;
   useful_area: number | null;
   land_area: number | null;
+  total_area: number | null;
+  built_area: number | null;
+  construction_year: number | null;
+  registry_data: string | null;
   owner_name: string | null;
   owner_contact: string | null;
   owner_email: string | null;
@@ -93,6 +111,19 @@ export default function ContractDetails() {
   const [tenantContact, setTenantContact] = useState<TenantContact | null>(null);
   const { mutate: logEvent } = useLogContractEvent();
 
+  // Encerrar contrato
+  const [terminateOpen, setTerminateOpen] = useState(false);
+  const [terminatingContract, setTerminatingContract] = useState(false);
+  const [terminateForm, setTerminateForm] = useState({ date: "", reason: "", notes: "" });
+
+  // Análise jurídica
+  const [legalAnalysisOpen, setLegalAnalysisOpen] = useState(false);
+
+  // Alterar conta
+  const [changeAccountOpen, setChangeAccountOpen] = useState(false);
+  const [savingAccountChange, setSavingAccountChange] = useState(false);
+  const [selectedNewAccountId, setSelectedNewAccountId] = useState("");
+
   // Estados para vincular imóvel
   const [linkPropertyOpen, setLinkPropertyOpen] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
@@ -119,6 +150,26 @@ export default function ContractDetails() {
     pre_paid: false,
     guarantee_type: "",
     guarantee_value: "",
+    water_amount: "",
+    electricity_amount: "",
+    gas_amount: "",
+    internet_amount: "",
+    condo_fee: "",
+    cleaning_fee: "",
+  });
+
+  // Query de contas disponíveis
+  const { data: availableAccounts } = useQuery({
+    queryKey: ["available-accounts", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("accounts")
+        .select("id, account_name")
+        .order("account_name");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user && changeAccountOpen,
   });
 
   // Query de imóveis disponíveis para vincular
@@ -251,6 +302,12 @@ export default function ContractDetails() {
         pre_paid: editForm.pre_paid,
         guarantee_type: editForm.guarantee_type || null,
         guarantee_value: editForm.guarantee_value ? parseFloat(editForm.guarantee_value) : null,
+        water_amount: editForm.water_amount ? parseFloat(editForm.water_amount) : null,
+        electricity_amount: editForm.electricity_amount ? parseFloat(editForm.electricity_amount) : null,
+        gas_amount: editForm.gas_amount ? parseFloat(editForm.gas_amount) : null,
+        internet_amount: editForm.internet_amount ? parseFloat(editForm.internet_amount) : null,
+        condo_fee: editForm.condo_fee ? parseFloat(editForm.condo_fee) : null,
+        cleaning_fee: editForm.cleaning_fee ? parseFloat(editForm.cleaning_fee) : null,
       };
 
       const { error } = await supabase
@@ -274,6 +331,109 @@ export default function ContractDetails() {
     } finally {
       setSavingEdit(false);
     }
+  };
+
+  const openAditamentos = () => {
+    if (!contract) return;
+    setEditForm({
+      tenant_name: contract.tenant_name ?? "",
+      tenant_document: contract.tenant_document ?? "",
+      tenant_rg: contract.tenant_rg ?? "",
+      tenant_email: contract.tenant_email ?? "",
+      tenant_phone: contract.tenant_phone ?? "",
+      tenant_profession: contract.tenant_profession ?? "",
+      tenant_emergency_phone: contract.tenant_emergency_phone ?? "",
+      contract_number: contract.contract_number ?? "",
+      start_date: contract.start_date ?? "",
+      end_date: contract.end_date ?? "",
+      rental_value: String(contract.rental_value ?? ""),
+      payment_day: String(contract.payment_day ?? ""),
+      payment_method: contract.payment_method ?? "",
+      adjustment_index: contract.adjustment_index ?? "",
+      pre_paid: contract.pre_paid ?? false,
+      guarantee_type: contract.guarantee_type ?? "",
+      guarantee_value: contract.guarantee_value ? String(contract.guarantee_value) : "",
+      water_amount: contract.water_amount ? String(contract.water_amount) : "",
+      electricity_amount: contract.electricity_amount ? String(contract.electricity_amount) : "",
+      gas_amount: contract.gas_amount ? String(contract.gas_amount) : "",
+      internet_amount: contract.internet_amount ? String(contract.internet_amount) : "",
+      condo_fee: contract.condo_fee ? String(contract.condo_fee) : "",
+      cleaning_fee: contract.cleaning_fee ? String(contract.cleaning_fee) : "",
+    });
+    setEditOpen(true);
+  };
+
+  const handleTerminate = async () => {
+    if (!contract || !terminateForm.date) return;
+    setTerminatingContract(true);
+    try {
+      const { error } = await supabase
+        .from("contracts")
+        .update({ status: "terminated", end_date: terminateForm.date })
+        .eq("id", contract.id);
+      if (error) throw error;
+
+      if (contract.property_id) {
+        await supabase
+          .from("properties")
+          .update({ status: "disponivel" })
+          .eq("id", contract.property_id);
+      }
+
+      logEvent({
+        contractId: contract.id,
+        eventType: "contract_terminated",
+        description: `Contrato encerrado — Motivo: ${terminateForm.reason || "Não informado"}`,
+        metadata: { date: terminateForm.date, reason: terminateForm.reason, notes: terminateForm.notes },
+      });
+
+      toast.success("Contrato encerrado com sucesso!");
+      setTerminateOpen(false);
+      fetchContractDetails();
+    } catch (err: any) {
+      toast.error("Erro ao encerrar contrato: " + err.message);
+    } finally {
+      setTerminatingContract(false);
+    }
+  };
+
+  const handleChangeAccount = async () => {
+    if (!contract || !selectedNewAccountId) return;
+    setSavingAccountChange(true);
+    try {
+      const { error } = await supabase
+        .from("contracts")
+        .update({ account_id: selectedNewAccountId })
+        .eq("id", contract.id);
+      if (error) throw error;
+
+      logEvent({
+        contractId: contract.id,
+        eventType: "contract_updated",
+        description: "Conta do contrato alterada",
+        metadata: { new_account_id: selectedNewAccountId },
+      });
+
+      toast.success("Conta alterada com sucesso!");
+      setChangeAccountOpen(false);
+      setSelectedNewAccountId("");
+      fetchContractDetails();
+    } catch (err: any) {
+      toast.error("Erro ao alterar conta: " + err.message);
+    } finally {
+      setSavingAccountChange(false);
+    }
+  };
+
+  const getLegalAnalysis = () => {
+    if (!contract) return null;
+    const today = new Date();
+    const start = new Date(contract.start_date);
+    const end = contract.end_date ? new Date(contract.end_date) : null;
+    const daysActive = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const daysRemaining = end ? Math.floor((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const totalDuration = end ? Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    return { today, start, end, daysActive, daysRemaining, totalDuration };
   };
 
   const getStatusBadge = (status: string) => {
@@ -345,33 +505,120 @@ export default function ContractDetails() {
             <CardHeader>
               <CardTitle>Imóvel</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Tipo</p>
-                  <p className="font-medium">{property.property_type}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Disponível</p>
-                  <p className="font-medium">{property.status === "available" ? "Sim" : "Não"}</p>
-                </div>
-              </div>
+            <CardContent className="space-y-4">
+              {/* Identificação */}
               <div>
-                <p className="text-sm text-muted-foreground">Endereço</p>
-                <p className="font-medium">{property.address}, {property.city}/{property.state}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Área Útil</p>
-                  <p className="font-medium">{property.useful_area ? `${property.useful_area} m²` : "N/A"}</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Identificação</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Nome / Identificação</p>
+                    <p className="font-medium">{property.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Tipo</p>
+                    <p className="font-medium">{property.property_type}</p>
+                  </div>
+                  {property.classification && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Classificação</p>
+                      <p className="font-medium">{property.classification}</p>
+                    </div>
+                  )}
+                  {property.transaction_type && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Tipo de Transação</p>
+                      <p className="font-medium">{property.transaction_type}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Status</p>
+                    <p className="font-medium">{property.status}</p>
+                  </div>
+                  {property.construction_year && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Ano de Construção</p>
+                      <p className="font-medium">{property.construction_year}</p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Terreno</p>
-                  <p className="font-medium">{property.land_area ? `${property.land_area} m²` : "N/A"}</p>
+              </div>
+
+              <Separator />
+
+              {/* Localização */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Localização</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground">Logradouro</p>
+                    <p className="font-medium">
+                      {property.address}{property.number ? `, ${property.number}` : ""}{property.complement ? ` — ${property.complement}` : ""}
+                    </p>
+                  </div>
+                  {property.neighborhood && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Bairro</p>
+                      <p className="font-medium">{property.neighborhood}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm text-muted-foreground">Cidade / Estado</p>
+                    <p className="font-medium">{property.city} / {property.state}</p>
+                  </div>
+                  {property.postal_code && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">CEP</p>
+                      <p className="font-medium">{property.postal_code}</p>
+                    </div>
+                  )}
+                  {property.country && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">País</p>
+                      <p className="font-medium">{property.country}</p>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              <Separator />
+
+              {/* Áreas */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Áreas</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Área Útil</p>
+                    <p className="font-medium">{property.useful_area ? `${property.useful_area} m²` : "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Área Total</p>
+                    <p className="font-medium">{property.total_area ? `${property.total_area} m²` : "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Área Construída</p>
+                    <p className="font-medium">{property.built_area ? `${property.built_area} m²` : "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Terreno</p>
+                    <p className="font-medium">{property.land_area ? `${property.land_area} m²` : "N/A"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {property.registry_data && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Registro</p>
+                    <p className="text-sm font-medium">{property.registry_data}</p>
+                  </div>
+                </>
+              )}
+
+              <Separator />
+
               <Button variant="outline" size="sm" asChild>
-                <Link to={`/imoveis/${property.id}`}>Visualizar Imóvel</Link>
+                <Link to={`/imoveis/${property.id}`}>Visualizar Imóvel Completo</Link>
               </Button>
             </CardContent>
           </Card>
@@ -528,26 +775,7 @@ export default function ContractDetails() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setEditForm({
-                      tenant_name: contract.tenant_name ?? "",
-                      tenant_document: contract.tenant_document ?? "",
-                      tenant_rg: contract.tenant_rg ?? "",
-                      tenant_email: contract.tenant_email ?? "",
-                      tenant_phone: contract.tenant_phone ?? "",
-                      tenant_profession: contract.tenant_profession ?? "",
-                      tenant_emergency_phone: contract.tenant_emergency_phone ?? "",
-                      contract_number: contract.contract_number ?? "",
-                      start_date: contract.start_date ?? "",
-                      end_date: contract.end_date ?? "",
-                      rental_value: String(contract.rental_value ?? ""),
-                      payment_day: String(contract.payment_day ?? ""),
-                      payment_method: contract.payment_method ?? "",
-                      adjustment_index: contract.adjustment_index ?? "",
-                      pre_paid: contract.pre_paid ?? false,
-                      guarantee_type: contract.guarantee_type ?? "",
-                      guarantee_value: contract.guarantee_value ? String(contract.guarantee_value) : "",
-                    });
-                    setEditOpen(true);
+                    openAditamentos();
                   }}
                 >
                   <Edit className="mr-2 h-4 w-4" />
@@ -784,20 +1012,33 @@ export default function ContractDetails() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <Button variant="outline" disabled>
-                <AlertCircle className="mr-2 h-4 w-4" />
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setTerminateForm({ date: format(new Date(), "yyyy-MM-dd"), reason: "", notes: "" });
+                  setTerminateOpen(true);
+                }}
+                disabled={contract.status === "terminated"}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
                 Encerrar contrato
               </Button>
-              <Button variant="outline" disabled>
-                <Plus className="mr-2 h-4 w-4" />
+              <Button variant="outline" onClick={openAditamentos}>
+                <Edit className="mr-2 h-4 w-4" />
                 Aditamentos
               </Button>
-              <Button variant="outline" disabled>
-                <FileText className="mr-2 h-4 w-4" />
+              <Button variant="outline" onClick={() => setLegalAnalysisOpen(true)}>
+                <Scale className="mr-2 h-4 w-4" />
                 Análise jurídica
               </Button>
-              <Button variant="outline" disabled>
-                <Edit className="mr-2 h-4 w-4" />
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedNewAccountId("");
+                  setChangeAccountOpen(true);
+                }}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
                 Alterar conta
               </Button>
                 <Button 
@@ -1034,6 +1275,75 @@ export default function ContractDetails() {
 
             <Separator />
 
+            {/* Encargos do Imóvel */}
+            <div>
+              <h4 className="font-semibold text-sm mb-3">Encargos do Imóvel (Valores Mensais)</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Condomínio (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={editForm.condo_fee}
+                    onChange={(e) => setEditForm(f => ({ ...f, condo_fee: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Água (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={editForm.water_amount}
+                    onChange={(e) => setEditForm(f => ({ ...f, water_amount: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Energia Elétrica (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={editForm.electricity_amount}
+                    onChange={(e) => setEditForm(f => ({ ...f, electricity_amount: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Gás (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={editForm.gas_amount}
+                    onChange={(e) => setEditForm(f => ({ ...f, gas_amount: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Internet (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={editForm.internet_amount}
+                    onChange={(e) => setEditForm(f => ({ ...f, internet_amount: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Taxa de Limpeza (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={editForm.cleaning_fee}
+                    onChange={(e) => setEditForm(f => ({ ...f, cleaning_fee: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
             {/* Garantia */}
             <div>
               <h4 className="font-semibold text-sm mb-3">Garantia</h4>
@@ -1096,6 +1406,192 @@ export default function ContractDetails() {
         existingCharges={contract.extra_charges || []}
         onUpdate={fetchContractDetails}
       />
+
+      {/* Dialog: Encerrar Contrato */}
+      <Dialog open={terminateOpen} onOpenChange={setTerminateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <XCircle className="h-5 w-5" />
+              Encerrar Contrato
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Esta ação encerrará o contrato e liberará o imóvel vinculado. O histórico será mantido.
+            </p>
+            <div>
+              <Label>Data de Encerramento *</Label>
+              <Input
+                type="date"
+                value={terminateForm.date}
+                onChange={(e) => setTerminateForm(f => ({ ...f, date: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Motivo do Encerramento</Label>
+              <Select
+                value={terminateForm.reason}
+                onValueChange={(v) => setTerminateForm(f => ({ ...f, reason: v }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fim_vigencia">Fim da Vigência</SelectItem>
+                  <SelectItem value="distrato">Distrato Amigável</SelectItem>
+                  <SelectItem value="inadimplencia">Inadimplência</SelectItem>
+                  <SelectItem value="rescisao_inquilino">Rescisão pelo Inquilino</SelectItem>
+                  <SelectItem value="rescisao_proprietario">Rescisão pelo Proprietário</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Observações</Label>
+              <Textarea
+                placeholder="Informações adicionais sobre o encerramento..."
+                value={terminateForm.notes}
+                onChange={(e) => setTerminateForm(f => ({ ...f, notes: e.target.value }))}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTerminateOpen(false)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={handleTerminate}
+              disabled={!terminateForm.date || terminatingContract}
+            >
+              {terminatingContract ? "Encerrando..." : "Confirmar Encerramento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Análise Jurídica */}
+      <Dialog open={legalAnalysisOpen} onOpenChange={setLegalAnalysisOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scale className="h-5 w-5" />
+              Análise Jurídica do Contrato
+            </DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const analysis = getLegalAnalysis();
+            if (!analysis) return null;
+            const { start, end, daysActive, daysRemaining, totalDuration } = analysis;
+            return (
+              <div className="space-y-4 py-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground">Início da Vigência</p>
+                    <p className="font-semibold text-sm">{format(start, "dd/MM/yyyy", { locale: ptBR })}</p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground">Término</p>
+                    <p className="font-semibold text-sm">{end ? format(end, "dd/MM/yyyy", { locale: ptBR }) : "Indeterminado"}</p>
+                  </div>
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground">Dias Ativos</p>
+                    <p className="font-semibold text-sm">{daysActive} dias</p>
+                  </div>
+                  {daysRemaining !== null && (
+                    <div className={`p-3 rounded-lg ${daysRemaining < 30 ? "bg-destructive/10" : "bg-muted"}`}>
+                      <p className="text-xs text-muted-foreground">Dias Restantes</p>
+                      <p className={`font-semibold text-sm ${daysRemaining < 30 ? "text-destructive" : ""}`}>
+                        {daysRemaining > 0 ? `${daysRemaining} dias` : "Expirado"}
+                      </p>
+                    </div>
+                  )}
+                  {totalDuration !== null && (
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-xs text-muted-foreground">Duração Total</p>
+                      <p className="font-semibold text-sm">{totalDuration} dias ({Math.round(totalDuration / 30)} meses)</p>
+                    </div>
+                  )}
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground">Valor Mensal</p>
+                    <p className="font-semibold text-sm">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(contract!.rental_value)}</p>
+                  </div>
+                </div>
+                <Separator />
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">Informações Legais</p>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Índice de reajuste:</span>
+                      <span className="font-medium">{contract!.adjustment_index || "Não definido"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tipo de garantia:</span>
+                      <span className="font-medium">{contract!.guarantee_type || "Sem garantia"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Aviso prévio (Lei 8.245/91):</span>
+                      <span className="font-medium">30 dias</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Multa por rescisão antecipada:</span>
+                      <span className="font-medium">{daysRemaining !== null && daysRemaining > 0 ? `Proporcional ao período restante` : "Não aplicável"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Status atual:</span>
+                      <span className="font-medium capitalize">{contract!.status === "active" || contract!.status === "vigente" ? "Vigente" : contract!.status === "terminated" ? "Encerrado" : contract!.status}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button onClick={() => setLegalAnalysisOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Alterar Conta */}
+      <Dialog open={changeAccountOpen} onOpenChange={setChangeAccountOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              Alterar Conta do Contrato
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Selecione a conta para a qual este contrato será transferido.
+            </p>
+            <div>
+              <Label>Nova Conta</Label>
+              <Select value={selectedNewAccountId} onValueChange={setSelectedNewAccountId}>
+                <SelectTrigger><SelectValue placeholder="Selecione uma conta..." /></SelectTrigger>
+                <SelectContent>
+                  {availableAccounts && availableAccounts.length > 0 ? (
+                    availableAccounts.map((acc) => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        {acc.account_name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>Nenhuma conta disponível</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangeAccountOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={handleChangeAccount}
+              disabled={!selectedNewAccountId || savingAccountChange}
+            >
+              {savingAccountChange ? "Alterando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
