@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { parseLocalDate } from "@/lib/utils";
 import { AppLayout } from "@/components/Layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -442,7 +443,7 @@ const DocumentsList = () => {
                                         <Calendar className="h-4 w-4 text-muted-foreground" />
                                         <span className="text-muted-foreground">Dt. Início:</span>
                                         <span className="font-medium">
-                                          {new Date(contract.start_date).toLocaleDateString("pt-BR")}
+                                          {parseLocalDate(contract.start_date).toLocaleDateString("pt-BR")}
                                         </span>
                                       </div>
                                       {contract.end_date && (
@@ -450,7 +451,7 @@ const DocumentsList = () => {
                                           <Calendar className="h-4 w-4 text-muted-foreground" />
                                           <span className="text-muted-foreground">Dt. Término:</span>
                                           <span className="font-medium">
-                                            {new Date(contract.end_date).toLocaleDateString("pt-BR")}
+                                            {parseLocalDate(contract.end_date).toLocaleDateString("pt-BR")}
                                           </span>
                                         </div>
                                       )}

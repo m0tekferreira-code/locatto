@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Building2, Check, ChevronLeft, ChevronRight, DollarSign, FileCheck, Plus, Shield, Trash2, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountId } from "@/hooks/useAccountId";
+import { parseLocalDate } from "@/lib/utils";
 
 const ContractWizard = () => {
   const { propertyId } = useParams();
@@ -967,14 +968,14 @@ const ContractWizard = () => {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Início:</span>
                   <span className="font-medium">
-                    {new Date(formData.start_date).toLocaleDateString("pt-BR")}
+                    {parseLocalDate(formData.start_date).toLocaleDateString("pt-BR")}
                   </span>
                 </div>
                 {formData.end_date && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Término:</span>
                     <span className="font-medium">
-                      {new Date(formData.end_date).toLocaleDateString("pt-BR")}
+                      {parseLocalDate(formData.end_date).toLocaleDateString("pt-BR")}
                     </span>
                   </div>
                 )}

@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { addDays } from "date-fns";
+import { parseLocalDate } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
@@ -260,8 +261,8 @@ const ContractsList = () => {
                                 <div className="text-sm">
                                   <p className="font-medium text-gray-700">Vigência</p>
                                   <p className="text-gray-500">
-                                    {new Date(contract.start_date).toLocaleDateString()} até{" "}
-                                    {contract.end_date ? new Date(contract.end_date).toLocaleDateString() : "Indeterminado"}
+                                    {parseLocalDate(contract.start_date).toLocaleDateString("pt-BR")} até{" "}
+                                    {contract.end_date ? parseLocalDate(contract.end_date).toLocaleDateString("pt-BR") : "Indeterminado"}
                                   </p>
                                 </div>
                               </div>

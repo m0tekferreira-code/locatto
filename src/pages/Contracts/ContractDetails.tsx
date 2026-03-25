@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { parseLocalDate } from "@/lib/utils";
 
 interface Contract {
   id: string;
@@ -428,8 +429,8 @@ export default function ContractDetails() {
   const getLegalAnalysis = () => {
     if (!contract) return null;
     const today = new Date();
-    const start = new Date(contract.start_date);
-    const end = contract.end_date ? new Date(contract.end_date) : null;
+    const start = parseLocalDate(contract.start_date);
+    const end = contract.end_date ? parseLocalDate(contract.end_date) : null;
     const daysActive = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     const daysRemaining = end ? Math.floor((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
     const totalDuration = end ? Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : null;
@@ -799,11 +800,11 @@ export default function ContractDetails() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Início da Vigência</p>
-                <p className="font-medium">{format(new Date(contract.start_date), "dd/MM/yyyy", { locale: ptBR })}</p>
+                <p className="font-medium">{format(parseLocalDate(contract.start_date), "dd/MM/yyyy", { locale: ptBR })}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Fim do Contrato</p>
-                <p className="font-medium">{contract.end_date ? format(new Date(contract.end_date), "dd/MM/yyyy", { locale: ptBR }) : "Indeterminado"}</p>
+                <p className="font-medium">{contract.end_date ? format(parseLocalDate(contract.end_date), "dd/MM/yyyy", { locale: ptBR }) : "Indeterminado"}</p>
               </div>
             </div>
 
@@ -870,7 +871,7 @@ export default function ContractDetails() {
                   {invoices.map((invoice) => (
                     <TableRow key={invoice.id}>
                       <TableCell>{`${invoice.reference_month.slice(5, 7)}/${invoice.reference_month.slice(0, 4)}`}</TableCell>
-                      <TableCell>{format(new Date(invoice.due_date), "dd/MM/yyyy")}</TableCell>
+                      <TableCell>{format(parseLocalDate(invoice.due_date), "dd/MM/yyyy")}</TableCell>
                       <TableCell>
                         {new Intl.NumberFormat("pt-BR", {
                           style: "currency",

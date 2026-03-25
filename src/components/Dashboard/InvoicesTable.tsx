@@ -8,6 +8,7 @@ import { Eye, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { parseLocalDate } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -201,8 +202,8 @@ export const InvoicesTable = ({ invoices }: InvoicesTableProps) => {
                         <TableCell className="font-semibold">
                           {Number(c.rental_value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                         </TableCell>
-                        <TableCell>{c.start_date ? format(new Date(c.start_date), "dd/MM/yyyy", { locale: ptBR }) : "—"}</TableCell>
-                        <TableCell>{c.end_date ? format(new Date(c.end_date), "dd/MM/yyyy", { locale: ptBR }) : "Indet."}</TableCell>
+                        <TableCell>{c.start_date ? format(parseLocalDate(c.start_date), "dd/MM/yyyy", { locale: ptBR }) : "—"}</TableCell>
+                        <TableCell>{c.end_date ? format(parseLocalDate(c.end_date), "dd/MM/yyyy", { locale: ptBR }) : "Indet."}</TableCell>
                         <TableCell>{getStatusBadge(c.status)}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="icon" onClick={() => navigate(`/documentos/${c.id}`)}>

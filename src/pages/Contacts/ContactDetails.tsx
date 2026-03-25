@@ -10,6 +10,7 @@ import { ContactFormDialog } from "@/components/Contacts/ContactFormDialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountId } from "@/hooks/useAccountId";
+import { parseLocalDate } from "@/lib/utils";
 
 const TYPE_LABELS: Record<string, string> = {
   inquilino: "Inquilino",
@@ -174,8 +175,8 @@ const ContactDetails = () => {
                       <TableCell>{c.contract_number || "-"}</TableCell>
                       <TableCell>{c.tenant_name}</TableCell>
                       <TableCell>R$ {Number(c.rental_value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
-                      <TableCell>{c.start_date ? new Date(c.start_date).toLocaleDateString("pt-BR") : "-"}</TableCell>
-                      <TableCell>{c.end_date ? new Date(c.end_date).toLocaleDateString("pt-BR") : "-"}</TableCell>
+                      <TableCell>{c.start_date ? parseLocalDate(c.start_date).toLocaleDateString("pt-BR") : "-"}</TableCell>
+                      <TableCell>{c.end_date ? parseLocalDate(c.end_date).toLocaleDateString("pt-BR") : "-"}</TableCell>
                       <TableCell>
                         <Badge variant={c.status === "active" ? "default" : "secondary"}>
                           {c.status === "active" ? "Ativo" : c.status}
