@@ -152,8 +152,8 @@ Deno.serve(async (req) => {
                            (refMonth.getMonth() - startDate.getMonth());
           guaranteeInstallmentNumber = monthsDiff + 1;
           
-          // Only add if within 12 months
-          if (guaranteeInstallmentNumber > 12) {
+          // Only add if within valid range (1–12)
+          if (guaranteeInstallmentNumber < 1 || guaranteeInstallmentNumber > 12) {
             guaranteeInstallment = 0;
             guaranteeInstallmentNumber = null;
           }
@@ -170,15 +170,15 @@ Deno.serve(async (req) => {
             // Skip if not active
             if (charge.status !== 'active') continue;
 
-            const chargeStartDate = new Date(charge.start_date);
-            
-            // Skip if charge hasn't started yet
-            if (refMonth < chargeStartDate) continue;
+            const chargeStartDate = new Date(charge.start_date ?? contract.start_date);
 
-            // Calculate months difference
+            // Calculate months difference (month-based, not timestamp)
             const monthsDiff = 
               (refMonth.getFullYear() - chargeStartDate.getFullYear()) * 12 + 
               (refMonth.getMonth() - chargeStartDate.getMonth());
+
+            // Skip if charge hasn't started yet (month not reached)
+            if (monthsDiff < 0) continue;
 
             let shouldApplyCharge = false;
 

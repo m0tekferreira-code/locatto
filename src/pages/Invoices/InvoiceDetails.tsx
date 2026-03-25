@@ -296,7 +296,7 @@ const InvoiceDetails = () => {
                   <div>
                     <p className="text-sm text-muted-foreground">Competência</p>
                     <p className="font-medium">
-                      {format(new Date(invoice.reference_month), "MMMM 'de' yyyy", { locale: ptBR })}
+                      {format(new Date(Number(invoice.reference_month.slice(0, 4)), Number(invoice.reference_month.slice(5, 7)) - 1, 1), "MMMM 'de' yyyy", { locale: ptBR })}
                     </p>
                   </div>
                   <div>
@@ -490,7 +490,7 @@ const InvoiceDetails = () => {
                       <div className="flex justify-between">
                         <span>
                           Parcela Garantia
-                          {invoice.guarantee_installment_number && ` (${invoice.guarantee_installment_number}/12)`}
+                          {invoice.guarantee_installment_number > 0 && ` (${invoice.guarantee_installment_number}/12)`}
                         </span>
                         <span className="font-medium">
                           R$ {Number(invoice.guarantee_installment).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}

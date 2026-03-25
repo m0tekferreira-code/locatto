@@ -91,7 +91,7 @@ export function GenerateInvoiceDialog() {
           (refMonth.getFullYear() - startDate.getFullYear()) * 12 +
           (refMonth.getMonth() - startDate.getMonth());
         const installNum = monthsDiff + 1;
-        if (installNum <= 12) {
+        if (installNum >= 1 && installNum <= 12) {
           guaranteeInstallment = Number(contract.guarantee_value) / 12;
           guaranteeInstallmentNumber = installNum;
         }
@@ -233,8 +233,17 @@ export function GenerateInvoiceDialog() {
     generateMutation.mutate();
   };
 
+  const handleOpenChange = (newOpen: boolean) => {
+    if (newOpen) {
+      setReferenceMonth(new Date());
+      setSelectedContract("");
+      setContractSearch("");
+    }
+    setOpen(newOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline">
           <Plus className="mr-2 h-4 w-4" />
@@ -349,13 +358,21 @@ export function GenerateInvoiceDialog() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Dia de Vencimento:</span>
-                  <span className="font-medium">{selectedContractData.payment_day || 5}</span>
+                  <span className="text-muted-foreground">Vencimento calculado:</span>
+                  <span className="font-medium">
+                    {(() => {
+                      const refMonth = new Date(referenceMonth.getFullYear(), referenceMonth.getMonth(), 1);
+                      const dueDate = new Date(refMonth);
+                      if (selectedContractData.pre_paid) dueDate.setMonth(dueDate.getMonth() + 1);
+                      dueDate.setDate(selectedContractData.payment_day || 5);
+                      return format(dueDate, "dd/MM/yyyy");
+                    })()}
+                  </span>
                 </div>
                 {selectedContractData.pre_paid && (
-                  <div className="flex justify-between text-primary">
-                    <span>Pré-pago:</span>
-                    <span className="font-medium">Sim</span>
+                  <div className="flex justify-between text-amber-600">
+                    <span>Contrato pré-pago:</span>
+                    <span className="font-medium">competência = mês anterior ao vencimento</span>
                   </div>
                 )}
               </div>

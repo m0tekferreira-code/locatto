@@ -789,7 +789,7 @@ const InvoicesList = () => {
                               R$ {Number(invoice.total_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                             </TableCell>
                             <TableCell>
-                              {format(new Date(invoice.reference_month), "MM/yyyy")}
+                              {`${invoice.reference_month.slice(5, 7)}/${invoice.reference_month.slice(0, 4)}`}
                             </TableCell>
                             <TableCell>
                               {format(new Date(invoice.due_date), "dd/MM/yyyy")}
@@ -951,7 +951,7 @@ const InvoicesList = () => {
                               </span>
                             </div>
                             <div className="text-right text-muted-foreground text-xs">
-                              <div>{format(new Date(inv.reference_month), "MM/yyyy")}</div>
+                              <div>{`${inv.reference_month.slice(5, 7)}/${inv.reference_month.slice(0, 4)}`}</div>
                               <div>R$ {Number(inv.total_amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
                             </div>
                           </div>

@@ -869,7 +869,7 @@ export default function ContractDetails() {
                 <TableBody>
                   {invoices.map((invoice) => (
                     <TableRow key={invoice.id}>
-                      <TableCell>{format(new Date(invoice.reference_month), "MM/yyyy")}</TableCell>
+                      <TableCell>{`${invoice.reference_month.slice(5, 7)}/${invoice.reference_month.slice(0, 4)}`}</TableCell>
                       <TableCell>{format(new Date(invoice.due_date), "dd/MM/yyyy")}</TableCell>
                       <TableCell>
                         {new Intl.NumberFormat("pt-BR", {
