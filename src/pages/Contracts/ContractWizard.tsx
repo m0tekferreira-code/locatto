@@ -24,8 +24,9 @@ const ContractWizard = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Form data state
-  const [formData, setFormData] = useState({
+  const STORAGE_KEY = `contract_wizard_${accountId ?? "anon"}_${propertyId ?? "new"}`;
+
+  const defaultFormData = {
     // Step 1: Tenant data
     tenant_name: "",
     tenant_document: "",
@@ -68,7 +69,28 @@ const ContractWizard = () => {
     // Step 4: Guarantee
     guarantee_type: "",
     guarantee_value: "",
+  };
+
+  // Restore saved form data from localStorage on mount
+  const [formData, setFormData] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) return { ...defaultFormData, ...JSON.parse(saved) };
+    } catch {
+      // ignore parse errors
+    }
+    return defaultFormData;
   });
+
+  // Persist form data to localStorage on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+    } catch {
+      // ignore storage errors
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData]);
 
   // Busca os imóveis disponíveis da conta (não alugados)
   const { data: availableProperties } = useQuery({
@@ -292,6 +314,7 @@ const ContractWizard = () => {
         description: "Contrato criado com sucesso",
       });
 
+      localStorage.removeItem(STORAGE_KEY);
       navigate(resolvedPropertyId ? `/imoveis/${resolvedPropertyId}` : "/contratos");
     } catch (error: any) {
       toast({
