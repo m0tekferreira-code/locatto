@@ -30,6 +30,7 @@ interface ExtraCharge {
 interface InvoiceData {
   id: string;
   invoice_number?: string;
+  due_date?: string;
   rental_amount?: number;
   water_amount?: number;
   electricity_amount?: number;
@@ -87,6 +88,7 @@ export function EditInvoiceDialog({
   const [discountDescription, setDiscountDescription] = useState<string>("");
   const [extraCharges, setExtraCharges] = useState<ExtraCharge[]>([]);
   const [notes, setNotes] = useState<string>("");
+  const [dueDate, setDueDate] = useState<string>("");
 
   // Helper states
   const [useMultipleTenantRate, setUseMultipleTenantRate] = useState(false);
@@ -104,6 +106,7 @@ export function EditInvoiceDialog({
       setDiscount(Number(invoice.discount) || 0);
       setDiscountDescription(invoice.discount_description || "");
       setNotes(invoice.notes || "");
+      setDueDate(invoice.due_date || "");
       
       // Check if using multiple tenant rate
       setUseMultipleTenantRate(
@@ -206,6 +209,7 @@ export function EditInvoiceDialog({
       const { error } = await supabase
         .from("invoices")
         .update({
+          due_date: dueDate || undefined,
           rental_amount: rentalAmount,
           water_amount: waterAmount,
           electricity_amount: electricityAmount,
@@ -267,6 +271,19 @@ export function EditInvoiceDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Vencimento */}
+          <div className="space-y-2">
+            <Label htmlFor="dueDate">Data de Vencimento</Label>
+            <Input
+              id="dueDate"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+
+          <Separator />
+
           {/* Quick Actions */}
           <div className="flex flex-wrap gap-2">
             <Button
