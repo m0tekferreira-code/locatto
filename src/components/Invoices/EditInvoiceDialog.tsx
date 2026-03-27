@@ -341,7 +341,7 @@ export function EditInvoiceDialog({
             <h4 className="font-medium mb-3">Consumo / Taxas</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="cleaning">Limpeza Lixeiras/Corredores</Label>
+                <Label htmlFor="cleaning">Estacionamento</Label>
                 <Input
                   id="cleaning"
                   type="number"
@@ -520,7 +520,7 @@ export function EditInvoiceDialog({
             )}
             {cleaningFee > 0 && (
               <div className="flex justify-between text-sm">
-                <span>Limpeza</span>
+                <span>Estacionamento</span>
                 <span>{formatCurrency(cleaningFee)}</span>
               </div>
             )}

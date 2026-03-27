@@ -913,11 +913,20 @@ export default function ContractDetails() {
                   onChange={async (e) => {
                     if (!e.target.files || !user?.id) return;
                     for (const file of Array.from(e.target.files)) {
-                      const storagePath = `${user.id}/${contract.id}/${Date.now()}_${file.name}`;
-                      const { error: upErr } = await supabase.storage
+                      const objectKey = `${Date.now()}_${crypto.randomUUID()}.pdf`;
+                      const storagePath = `${user.id}/${contract.id}/${objectKey}`;
+                      const contentType = file.type?.trim() || "application/pdf";
+                      let { error: upErr } = await supabase.storage
                         .from("contract-documents")
-                        .upload(storagePath, file, { contentType: file.type });
-                      if (upErr) { toast.error(`Erro ao enviar ${file.name}`); continue; }
+                        .upload(storagePath, file, { contentType, upsert: false });
+                      // Retry without explicit contentType if 400 error
+                      if (upErr && (upErr as any).statusCode === "400") {
+                        const retry = await supabase.storage
+                          .from("contract-documents")
+                          .upload(storagePath, file, { upsert: false });
+                        upErr = retry.error;
+                      }
+                      if (upErr) { toast.error(`Erro ao enviar ${file.name}: ${(upErr as any).message ?? upErr}`); continue; }
                       const existingDocs = Array.isArray(contract.extra_charges) ? [] : [];
                       const docs = Array.isArray((contract as any).documents) ? (contract as any).documents : [];
                       const newDoc = { name: file.name, path: storagePath, type: file.type, size: file.size, uploaded_at: new Date().toISOString() };
@@ -1331,7 +1340,7 @@ export default function ContractDetails() {
                   />
                 </div>
                 <div>
-                  <Label>Taxa de Limpeza (R$)</Label>
+                  <Label>Estacionamento (R$)</Label>
                   <Input
                     type="number"
                     step="0.01"

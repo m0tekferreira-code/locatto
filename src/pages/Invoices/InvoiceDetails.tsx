@@ -481,7 +481,7 @@ const InvoiceDetails = () => {
                     )}
                     {Number(invoice.cleaning_fee) > 0 && (
                       <div className="flex justify-between">
-                        <span>Limpeza Lixeiras/Corredores</span>
+                        <span>Estacionamento</span>
                         <span className="font-medium">
                           R$ {Number(invoice.cleaning_fee).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                         </span>

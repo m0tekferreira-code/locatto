@@ -701,7 +701,7 @@ const ContractWizard = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="cleaning_fee">Limpeza (R$)</Label>
+                  <Label htmlFor="cleaning_fee">Estacionamento (R$)</Label>
                   <Input
                     id="cleaning_fee"
                     type="number"

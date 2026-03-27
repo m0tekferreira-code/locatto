@@ -615,7 +615,7 @@ export function ImportInvoiceDetailsDialog({
       electricity_amount: "Luz",
       gas_amount: "Gás",
       internet_amount: "Internet",
-      cleaning_fee: "Limpeza",
+      cleaning_fee: "Estacionamento",
       condo_fee: "Condomínio",
       discount: "Desconto",
       guarantee_installment: "Caução",
