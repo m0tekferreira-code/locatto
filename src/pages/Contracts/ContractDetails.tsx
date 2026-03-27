@@ -34,6 +34,7 @@ interface Contract {
   payment_day: number;
   guarantee_type: string | null;
   guarantee_value: number | null;
+  guarantee_installments: number | null;
   payment_method: string;
   adjustment_index: string | null;
   pre_paid: boolean;
@@ -151,6 +152,7 @@ export default function ContractDetails() {
     pre_paid: false,
     guarantee_type: "",
     guarantee_value: "",
+    guarantee_installments: "1",
     water_amount: "",
     electricity_amount: "",
     gas_amount: "",
@@ -303,6 +305,7 @@ export default function ContractDetails() {
         pre_paid: editForm.pre_paid,
         guarantee_type: editForm.guarantee_type || null,
         guarantee_value: editForm.guarantee_value ? parseFloat(editForm.guarantee_value) : null,
+        guarantee_installments: editForm.guarantee_value && editForm.guarantee_type && editForm.guarantee_type !== "none" ? (parseInt(editForm.guarantee_installments) || 1) : null,
         water_amount: editForm.water_amount ? parseFloat(editForm.water_amount) : null,
         electricity_amount: editForm.electricity_amount ? parseFloat(editForm.electricity_amount) : null,
         gas_amount: editForm.gas_amount ? parseFloat(editForm.gas_amount) : null,
@@ -354,6 +357,7 @@ export default function ContractDetails() {
       pre_paid: contract.pre_paid ?? false,
       guarantee_type: contract.guarantee_type ?? "",
       guarantee_value: contract.guarantee_value ? String(contract.guarantee_value) : "",
+      guarantee_installments: contract.guarantee_installments ? String(contract.guarantee_installments) : "1",
       water_amount: contract.water_amount ? String(contract.water_amount) : "",
       electricity_amount: contract.electricity_amount ? String(contract.electricity_amount) : "",
       gas_amount: contract.gas_amount ? String(contract.gas_amount) : "",
@@ -1382,6 +1386,24 @@ export default function ContractDetails() {
                       value={editForm.guarantee_value}
                       onChange={(e) => setEditForm(f => ({ ...f, guarantee_value: e.target.value }))}
                     />
+                  </div>
+                )}
+                {editForm.guarantee_type && editForm.guarantee_type !== "none" && editForm.guarantee_value && (
+                  <div className="col-span-2">
+                    <Label>Cobrar em quantas parcelas?</Label>
+                    <Select
+                      value={editForm.guarantee_installments}
+                      onValueChange={(v) => setEditForm(f => ({ ...f, guarantee_installments: v }))}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            {n}x {editForm.guarantee_value ? `(R$ ${(parseFloat(editForm.guarantee_value) / n).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} / parcela)` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
               </div>

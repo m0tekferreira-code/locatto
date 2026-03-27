@@ -69,6 +69,7 @@ const ContractWizard = () => {
     // Step 4: Guarantee
     guarantee_type: "",
     guarantee_value: "",
+    guarantee_installments: "1",
   };
 
   // Restore saved form data from localStorage on mount
@@ -241,6 +242,7 @@ const ContractWizard = () => {
           : null,
         guarantee_type: formData.guarantee_type || null,
         guarantee_value: formData.guarantee_value ? parseFloat(formData.guarantee_value) : null,
+        guarantee_installments: formData.guarantee_value && formData.guarantee_type && formData.guarantee_type !== "none" ? (parseInt(formData.guarantee_installments) || 1) : null,
         status: "active",
       }).select("id").single();
 
@@ -901,6 +903,26 @@ const ContractWizard = () => {
                 />
               </div>
             )}
+            {formData.guarantee_type && formData.guarantee_type !== "none" && formData.guarantee_value && (
+              <div>
+                <Label htmlFor="guarantee_installments">Cobrar em quantas parcelas?</Label>
+                <Select
+                  value={formData.guarantee_installments}
+                  onValueChange={(value) => updateFormData("guarantee_installments", value)}
+                >
+                  <SelectTrigger id="guarantee_installments">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n}x {formData.guarantee_value ? `(R$ ${(parseFloat(formData.guarantee_value) / n).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} / parcela)` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="rounded-lg bg-muted p-4 mt-6">
               <h4 className="font-semibold mb-2">Informação</h4>
               <p className="text-sm text-muted-foreground">
@@ -1031,6 +1053,14 @@ const ContractWizard = () => {
                       <span className="text-muted-foreground">Valor:</span>
                       <span className="font-medium">
                         R$ {parseFloat(formData.guarantee_value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                  {formData.guarantee_value && parseInt(formData.guarantee_installments) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Parcelas:</span>
+                      <span className="font-medium">
+                        {formData.guarantee_installments}x de R$ {(parseFloat(formData.guarantee_value) / parseInt(formData.guarantee_installments)).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   )}

@@ -248,6 +248,7 @@ export type Database = {
           end_date: string | null
           extra_charges: Json | null
           gas_amount: number | null
+          guarantee_installments: number | null
           guarantee_type: string | null
           guarantee_value: number | null
           id: string
@@ -283,6 +284,7 @@ export type Database = {
           end_date?: string | null
           extra_charges?: Json | null
           gas_amount?: number | null
+          guarantee_installments?: number | null
           guarantee_type?: string | null
           guarantee_value?: number | null
           id?: string
@@ -318,6 +320,7 @@ export type Database = {
           end_date?: string | null
           extra_charges?: Json | null
           gas_amount?: number | null
+          guarantee_installments?: number | null
           guarantee_type?: string | null
           guarantee_value?: number | null
           id?: string

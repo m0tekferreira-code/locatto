@@ -86,13 +86,14 @@ export function GenerateInvoiceDialog() {
       let guaranteeInstallment = 0;
       let guaranteeInstallmentNumber: number | null = null;
       if (contract.guarantee_type && contract.guarantee_value && Number(contract.guarantee_value) > 0) {
+        const totalInstallments = Number((contract as any).guarantee_installments) || 1;
         const startDate = new Date(contract.start_date);
         const monthsDiff =
           (refMonth.getFullYear() - startDate.getFullYear()) * 12 +
           (refMonth.getMonth() - startDate.getMonth());
         const installNum = monthsDiff + 1;
-        if (installNum >= 1 && installNum <= 12) {
-          guaranteeInstallment = Number(contract.guarantee_value) / 12;
+        if (installNum >= 1 && installNum <= totalInstallments) {
+          guaranteeInstallment = Number(contract.guarantee_value) / totalInstallments;
           guaranteeInstallmentNumber = installNum;
         }
       }

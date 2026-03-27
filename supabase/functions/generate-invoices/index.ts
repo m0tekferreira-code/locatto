@@ -143,8 +143,8 @@ Deno.serve(async (req) => {
         let guaranteeInstallmentNumber = null;
 
         if (contract.guarantee_type && contract.guarantee_value && Number(contract.guarantee_value) > 0) {
-          // Assuming 12 installments for guarantee
-          guaranteeInstallment = Number(contract.guarantee_value) / 12;
+          const totalInstallments = Number(contract.guarantee_installments) || 1;
+          guaranteeInstallment = Number(contract.guarantee_value) / totalInstallments;
           
           // Calculate installment number based on contract start date
           const startDate = new Date(contract.start_date);
@@ -152,8 +152,8 @@ Deno.serve(async (req) => {
                            (refMonth.getMonth() - startDate.getMonth());
           guaranteeInstallmentNumber = monthsDiff + 1;
           
-          // Only add if within valid range (1–12)
-          if (guaranteeInstallmentNumber < 1 || guaranteeInstallmentNumber > 12) {
+          // Only add if within valid range
+          if (guaranteeInstallmentNumber < 1 || guaranteeInstallmentNumber > totalInstallments) {
             guaranteeInstallment = 0;
             guaranteeInstallmentNumber = null;
           }
