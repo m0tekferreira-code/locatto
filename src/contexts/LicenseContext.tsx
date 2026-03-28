@@ -26,7 +26,7 @@ export const LicenseProvider = ({ children }: { children: ReactNode }) => {
   });
   const isChecking = useRef(false);
 
-  const checkLicense = async (skipCache = false) => {
+  const checkLicense = async (skipCache = false, tokenOverride?: string) => {
     // Prevent concurrent calls that cause refresh loops
     if (isChecking.current) return;
     isChecking.current = true;
@@ -44,32 +44,41 @@ export const LicenseProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      // Get current session (do NOT call refreshSession to avoid triggering TOKEN_REFRESHED loop)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setState({
-          isValid: false,
-          expiresAt: null,
-          loading: false,
-          canEdit: false,
-          daysRemaining: null,
-          isTrial: false,
-        });
-        return;
-      }
+      // Resolve the access token to use.
+      // When called from onAuthStateChange the fresh token is passed directly
+      // (tokenOverride) so we avoid reading a stale value from the internal
+      // session store while _recoverAndRefresh is still in progress.
+      let accessToken = tokenOverride;
 
-      // Skip function call if local token is already expired.
-      const expiresAtMs = session.expires_at ? session.expires_at * 1000 : null;
-      if (expiresAtMs && expiresAtMs <= Date.now()) {
-        setState({
-          isValid: true,
-          expiresAt: null,
-          loading: false,
-          canEdit: true,
-          daysRemaining: null,
-          isTrial: false,
-        });
-        return;
+      if (!accessToken) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setState({
+            isValid: false,
+            expiresAt: null,
+            loading: false,
+            canEdit: false,
+            daysRemaining: null,
+            isTrial: false,
+          });
+          return;
+        }
+
+        // Skip function call if local token is already expired.
+        const expiresAtMs = session.expires_at ? session.expires_at * 1000 : null;
+        if (expiresAtMs && expiresAtMs <= Date.now()) {
+          setState({
+            isValid: true,
+            expiresAt: null,
+            loading: false,
+            canEdit: true,
+            daysRemaining: null,
+            isTrial: false,
+          });
+          return;
+        }
+
+        accessToken = session.access_token;
       }
 
       // In local development we skip remote license verification to avoid
@@ -86,11 +95,11 @@ export const LicenseProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // Call license verification edge function.
-      // Do NOT pass an explicit Authorization header – let the Supabase client
-      // attach the freshest token via its internal _accessToken() getter so we
-      // avoid using a stale token that was rotated by a concurrent refresh.
-      const { data, error } = await supabase.functions.invoke('license-verify');
+      // Always pass the token explicitly so we never depend on the client's
+      // internal auth store, which may be stale during _recoverAndRefresh.
+      const { data, error } = await supabase.functions.invoke('license-verify', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
 
       if (error) {
         const status =
@@ -164,20 +173,25 @@ export const LicenseProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // Listen for auth state changes - only re-check on SIGNED_IN (not TOKEN_REFRESHED)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
+    // Listen for auth state changes.
+    // The callback receives the fresh session directly from the auth machinery,
+    // so we forward its access_token to avoid using a stale internal reference.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
         sessionStorage.removeItem(CACHE_KEY);
-        checkLicense(true);
+        checkLicense(true, session.access_token);
       }
     });
 
-    checkLicense();
+    // Delay the initial check slightly so the Supabase client has time to
+    // finish _recoverAndRefresh before we attempt to read the session.
+    const initTimeout = setTimeout(() => checkLicense(), 1500);
 
     // Check every 10 minutes
     const interval = setInterval(() => checkLicense(true), CACHE_DURATION);
 
     return () => {
+      clearTimeout(initTimeout);
       clearInterval(interval);
       subscription.unsubscribe();
     };
