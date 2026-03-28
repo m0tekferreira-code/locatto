@@ -72,20 +72,6 @@ export const LicenseProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // Confirm the access token is accepted before invoking edge function.
-      const { data: userData, error: tokenError } = await supabase.auth.getUser(session.access_token);
-      if (tokenError || !userData?.user) {
-        setState({
-          isValid: true,
-          expiresAt: null,
-          loading: false,
-          canEdit: true,
-          daysRemaining: null,
-          isTrial: false,
-        });
-        return;
-      }
-
       // In local development we skip remote license verification to avoid
       // blocking login when Edge Functions are not deployed/configured yet.
       if (import.meta.env.DEV) {
@@ -100,12 +86,11 @@ export const LicenseProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // Call license verification edge function with current token
-      const { data, error } = await supabase.functions.invoke('license-verify', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+      // Call license verification edge function.
+      // Do NOT pass an explicit Authorization header – let the Supabase client
+      // attach the freshest token via its internal _accessToken() getter so we
+      // avoid using a stale token that was rotated by a concurrent refresh.
+      const { data, error } = await supabase.functions.invoke('license-verify');
 
       if (error) {
         const status =
