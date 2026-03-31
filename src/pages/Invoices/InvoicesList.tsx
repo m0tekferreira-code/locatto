@@ -38,7 +38,7 @@ const InvoicesList = () => {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("pending");
   const [paymentMethodFilter, setPaymentMethodFilter] = useState("all");
   const [contractFilter, setContractFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
@@ -235,7 +235,11 @@ const InvoicesList = () => {
       invoice.contracts?.contract_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       invoice.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
+    const matchesStatus = statusFilter === "all" 
+      ? true 
+      : (statusFilter === "pending" 
+        ? (invoice.status === "pending" || invoice.status === "overdue") 
+        : invoice.status === statusFilter);
     const matchesPaymentMethod = paymentMethodFilter === "all" || invoice.payment_method === paymentMethodFilter;
     const matchesContract = !contractFilter || 
       invoice.contracts?.contract_number?.toLowerCase().includes(contractFilter.toLowerCase()) ||
@@ -647,11 +651,25 @@ const InvoicesList = () => {
           ) : invoices && invoices.length > 0 ? (
             <>
               {/* Status Tabs */}
-              <div className="flex items-center gap-4 mb-4 border-b">
+              <div className="flex items-center gap-4 mb-4 border-b overflow-x-auto pb-1">
+                <button
+                  onClick={() => setStatusFilter("all")}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
+                    statusFilter === "all" 
+                      ? "border-primary text-primary" 
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  Todas
+                  <Badge variant="secondary" className="ml-1">
+                    {invoices.length}
+                  </Badge>
+                </button>
                 <button
                   onClick={() => setStatusFilter("paid")}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
                     statusFilter === "paid" 
                       ? "border-primary text-primary" 
                       : "border-transparent text-muted-foreground hover:text-foreground"
@@ -665,35 +683,44 @@ const InvoicesList = () => {
                 <button
                   onClick={() => setStatusFilter("pending")}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
                     statusFilter === "pending" 
                       ? "border-primary text-primary" 
                       : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Pendente
+                  <Badge variant="secondary" className="ml-1 bg-yellow-100 text-yellow-800">
+                    {(statusCounts.pending || 0) + (statusCounts.overdue || 0)}
+                  </Badge>
                 </button>
                 <button
                   onClick={() => setStatusFilter("cancelled")}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
                     statusFilter === "cancelled" 
                       ? "border-primary text-primary" 
                       : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Cancelado
+                  <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-800">
+                    {statusCounts.cancelled || 0}
+                  </Badge>
                 </button>
                 <button
                   onClick={() => setStatusFilter("judicial")}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                    "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap",
                     statusFilter === "judicial" 
                       ? "border-primary text-primary" 
                       : "border-transparent text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Cobrança Judicial
+                  <Badge variant="secondary" className="ml-1 bg-red-100 text-red-800">
+                    {statusCounts.judicial || 0}
+                  </Badge>
                 </button>
               </div>
 

@@ -18,6 +18,7 @@ export const useRecentInvoices = (userId: string | undefined, accountId: string 
           contract:contracts(tenant_name, property:properties(name))
         `)
         .eq(filterColumn, filterValue)
+        .neq("status", "cancelled")
         .order("created_at", { ascending: false })
         .limit(limit);
 

@@ -1,5 +1,5 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, CheckCircle, XCircle, FileText, Home, User, Calendar, Pencil } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, FileText, Home, User, Calendar, Pencil, Trash2, FileDown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { EditInvoiceDialog } from "@/components/Invoices/EditInvoiceDialog";
+import { InvoicePDFTemplate } from "@/components/Invoices/InvoicePDFTemplate";
+import html2pdf from "html2pdf.js";
 
 const InvoiceDetails = () => {
   const { id } = useParams();
@@ -20,6 +22,48 @@ const InvoiceDetails = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const pdfTemplateRef = React.useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportPDF = async () => {
+    if (!pdfTemplateRef.current || !invoice) return;
+    setIsExporting(true);
+
+    try {
+      const element = pdfTemplateRef.current;
+      
+      // Temporarily make it visible for html2pdf
+      element.style.display = 'block';
+
+      const opt = {
+        margin:       0,
+        filename:     `Fatura-${invoice.invoice_number}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf().from(element).set(opt).save();
+      
+      toast({
+        title: "PDF gerado com sucesso",
+        description: "O download iniciará em instantes.",
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Erro ao gerar PDF",
+        description: "Ocorreu um erro ao gerar o arquivo.",
+        variant: "destructive",
+      });
+    } finally {
+      // Hide again
+      if (pdfTemplateRef.current) {
+        pdfTemplateRef.current.style.display = 'none';
+      }
+      setIsExporting(false);
+    }
+  };
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ["invoice", id],
@@ -122,35 +166,25 @@ const InvoiceDetails = () => {
 
   const cancelInvoiceMutation = useMutation({
     mutationFn: async () => {
-      const currentHistory = Array.isArray(invoice?.history) ? invoice.history : [];
+      // Excluir a fatura ao invés de apenas mudar o status para 'cancelled'
       const { error } = await supabase
         .from("invoices")
-        .update({ 
-          status: "cancelled",
-          history: [
-            ...currentHistory,
-            {
-              action: 'cancelled',
-              timestamp: new Date().toISOString(),
-              user_id: user?.id
-            }
-          ]
-        })
+        .delete()
         .eq("id", id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["invoice", id] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast({
-        title: "Fatura cancelada",
-        description: "A fatura foi cancelada com sucesso.",
+        title: "Fatura apagada",
+        description: "A fatura foi apagada com sucesso.",
       });
+      navigate("/faturas");
     },
     onError: (error) => {
       toast({
-        title: "Erro ao cancelar fatura",
+        title: "Erro ao apagar fatura",
         description: error instanceof Error ? error.message : "Erro desconhecido",
         variant: "destructive",
       });
@@ -240,6 +274,14 @@ const InvoiceDetails = () => {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
+                  onClick={handleExportPDF}
+                  disabled={isExporting}
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  {isExporting ? "Gerando..." : "Exportar PDF"}
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => setEditDialogOpen(true)}
                   disabled={invoice.status === "cancelled"}
                 >
@@ -259,12 +301,12 @@ const InvoiceDetails = () => {
                 {(invoice.status === "pending" || invoice.status === "overdue") && (
                   <>
                     <Button
-                      variant="outline"
+                      variant="destructive"
                       onClick={() => cancelInvoiceMutation.mutate()}
                       disabled={cancelInvoiceMutation.isPending}
                     >
-                      <XCircle className="mr-2 h-4 w-4" />
-                      Cancelar
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Apagar Fatura
                     </Button>
                     <Button
                       onClick={() => markAsPaidMutation.mutate()}
@@ -595,6 +637,9 @@ const InvoiceDetails = () => {
                 : 0)
             }
           />
+      </div>
+
+      <InvoicePDFTemplate ref={pdfTemplateRef} invoice={invoice} />
     </AppLayout>
   );
 };

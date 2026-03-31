@@ -238,6 +238,7 @@ export default function ContractDetails() {
         .from("invoices")
         .select("*")
         .eq("contract_id", id)
+        .neq("status", "cancelled")
         .order("due_date", { ascending: false });
 
       if (invoicesError) throw invoicesError;

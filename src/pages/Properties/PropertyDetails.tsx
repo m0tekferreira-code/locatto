@@ -99,6 +99,7 @@ const PropertyDetails = () => {
         .from("invoices")
         .select("*")
         .eq("property_id", id)
+        .neq("status", "cancelled")
         .order("due_date", { ascending: false })
         .limit(10);
 
