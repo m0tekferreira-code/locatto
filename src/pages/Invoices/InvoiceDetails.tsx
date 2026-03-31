@@ -624,7 +624,6 @@ const InvoiceDetails = () => {
                 </Link>
               </CardContent>
             </Card>
-          </div>
 
           {/* Edit Invoice Dialog */}
           <EditInvoiceDialog
