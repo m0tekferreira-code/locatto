@@ -637,9 +637,9 @@ const InvoiceDetails = () => {
                 : 0)
             }
           />
-      </div>
 
-      <InvoicePDFTemplate ref={pdfTemplateRef} invoice={invoice} />
+          <InvoicePDFTemplate ref={pdfTemplateRef} invoice={invoice} />
+      </div>
     </AppLayout>
   );
 };
