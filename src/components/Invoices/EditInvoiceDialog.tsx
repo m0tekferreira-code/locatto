@@ -131,6 +131,7 @@ export function EditInvoiceDialog({
 
   // Calculate total
   const calculateTotal = () => {
+    const guaranteeInstallment = Number(invoice?.guarantee_installment) || 0;
     const charges = 
       rentalAmount +
       waterAmount +
@@ -139,6 +140,7 @@ export function EditInvoiceDialog({
       internetAmount +
       cleaningFee +
       condoFee +
+      guaranteeInstallment +
       extraCharges.reduce((sum, charge) => sum + charge.value, 0);
     
     return charges - discount;
