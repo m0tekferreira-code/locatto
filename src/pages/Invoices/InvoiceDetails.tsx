@@ -82,6 +82,7 @@ const InvoiceDetails = () => {
             co_tenants,
             payment_method,
             guarantee_type,
+            guarantee_installments,
             start_date,
             end_date,
             properties (
@@ -533,7 +534,7 @@ const InvoiceDetails = () => {
                       <div className="flex justify-between">
                         <span>
                           Parcela Garantia
-                          {invoice.guarantee_installment_number > 0 && ` (${invoice.guarantee_installment_number}/12)`}
+                          {invoice.guarantee_installment_number > 0 && ` (${invoice.guarantee_installment_number}/${invoice.contracts?.guarantee_installments || invoice.guarantee_installment_number})`}
                         </span>
                         <span className="font-medium">
                           R$ {Number(invoice.guarantee_installment).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}

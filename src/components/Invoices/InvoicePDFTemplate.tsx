@@ -151,7 +151,7 @@ export const InvoicePDFTemplate = React.forwardRef<HTMLDivElement, InvoicePDFTem
               {Number(invoice.guarantee_installment) > 0 && (
                 <tr className="border-b border-slate-200">
                   <td className="py-3 px-3 font-medium text-slate-700">
-                    Parcela de Garantia {(invoice.guarantee_installment_number && invoice.guarantee_installment_number > 0) ? `(${invoice.guarantee_installment_number}/12)` : ''}
+                    Parcela de Garantia {(invoice.guarantee_installment_number && invoice.guarantee_installment_number > 0) ? `(${invoice.guarantee_installment_number}/${invoice.guarantee_total_installments || contract?.guarantee_installments || invoice.guarantee_installment_number})` : ''}
                   </td>
                   <td className="py-3 px-3 text-right text-slate-700">{formatCurrency(invoice.guarantee_installment)}</td>
                 </tr>
