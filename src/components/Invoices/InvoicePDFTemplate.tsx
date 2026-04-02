@@ -161,7 +161,7 @@ export const InvoicePDFTemplate = React.forwardRef<HTMLDivElement, InvoicePDFTem
               {invoice.extra_charges && Array.isArray(invoice.extra_charges) && invoice.extra_charges.length > 0 && invoice.extra_charges.map((charge: any, idx: number) => (
                 <tr key={idx} className="border-b border-slate-200">
                   <td className="py-3 px-3 font-medium text-slate-700">{charge.description || "Cobrança Adicional"}</td>
-                  <td className="py-3 px-3 text-right text-slate-700">{formatCurrency(charge.amount || 0)}</td>
+                  <td className="py-3 px-3 text-right text-slate-700">{formatCurrency(charge.value_per_installment || charge.value || charge.amount || 0)}</td>
                 </tr>
               ))}
               
