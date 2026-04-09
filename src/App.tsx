@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LicenseProvider } from "@/contexts/LicenseContext";
+import { useAutoMigration } from "@/hooks/useAutoMigration";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/AdminRoute";
@@ -42,12 +43,18 @@ import PortalSettings from "./pages/Properties/PortalSettings";
 import GeneralSettings from "./pages/Settings/GeneralSettings";
 import ImportConciliacao from "./pages/Settings/ImportConciliacao";
 import ProfileSettings from "./pages/Settings/ProfileSettings";
+import EmailSettings from "./pages/Settings/EmailSettings";
 import ContactsList from "./pages/Contacts/ContactsList";
 import ContactDetails from "./pages/Contacts/ContactDetails";
 import InspectionWizard from "./pages/Inspections/InspectionWizard";
 import RlsFixPage from "./pages/Admin/RlsFixPage";
 
 const queryClient = new QueryClient();
+
+const AutoMigration = ({ children }: { children: React.ReactNode }) => {
+  useAutoMigration();
+  return <>{children}</>;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -57,6 +64,7 @@ const App = () => (
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <LicenseProvider>
+            <AutoMigration>
               <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/register" element={<Register />} />
@@ -188,6 +196,11 @@ const App = () => (
                 <ProfileSettings />
               </ProtectedRoute>
             } />
+            <Route path="/configuracoes/email" element={
+              <ProtectedRoute>
+                <EmailSettings />
+              </ProtectedRoute>
+            } />
             <Route path="/vistorias" element={
               <ProtectedRoute>
                 <InspectionWizard />
@@ -245,6 +258,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
               </Routes>
+            </AutoMigration>
           </LicenseProvider>
         </AuthProvider>
       </BrowserRouter>

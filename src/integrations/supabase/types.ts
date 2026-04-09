@@ -1257,6 +1257,59 @@ export type Database = {
           },
         ]
       }
+      smtp_settings: {
+        Row: {
+          id: string
+          account_id: string
+          smtp_host: string
+          smtp_port: number
+          smtp_user: string
+          smtp_pass: string
+          from_email: string
+          from_name: string
+          use_tls: boolean
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          smtp_host: string
+          smtp_port?: number
+          smtp_user: string
+          smtp_pass: string
+          from_email: string
+          from_name?: string
+          use_tls?: boolean
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          smtp_host?: string
+          smtp_port?: number
+          smtp_user?: string
+          smtp_pass?: string
+          from_email?: string
+          from_name?: string
+          use_tls?: boolean
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "smtp_settings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null

@@ -85,6 +85,7 @@ const menuItems: MenuItem[] = [
     label: "Configurações",
     submenu: [
       { label: "Geral", path: "/configuracoes" },
+      { label: "E-mail (SMTP)", path: "/configuracoes/email" },
       { label: "Portais Imobiliários", path: "/configuracoes/portais" },
       { label: "Meu Perfil", path: "/configuracoes/perfil" },
     ],
@@ -184,7 +185,7 @@ export const Sidebar = () => {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { isSuperAdmin } = useSuperAdminCheck();
-  const [openMenus, setOpenMenus] = useState<string[]>(["Imóveis", "Super Admin", "Configurações", "Financeiro"]);
+  const [openMenus, setOpenMenus] = useState<string[]>([]);
   const { open } = useSidebar();
 
   const toggleMenu = (label: string) => {
