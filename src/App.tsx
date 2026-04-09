@@ -44,6 +44,7 @@ import GeneralSettings from "./pages/Settings/GeneralSettings";
 import ImportConciliacao from "./pages/Settings/ImportConciliacao";
 import ProfileSettings from "./pages/Settings/ProfileSettings";
 import EmailSettings from "./pages/Settings/EmailSettings";
+import WebhookSettings from "./pages/Settings/WebhookSettings";
 import ContactsList from "./pages/Contacts/ContactsList";
 import ContactDetails from "./pages/Contacts/ContactDetails";
 import InspectionWizard from "./pages/Inspections/InspectionWizard";
@@ -199,6 +200,11 @@ const App = () => (
             <Route path="/configuracoes/email" element={
               <ProtectedRoute>
                 <EmailSettings />
+              </ProtectedRoute>
+            } />
+            <Route path="/configuracoes/webhooks" element={
+              <ProtectedRoute>
+                <WebhookSettings />
               </ProtectedRoute>
             } />
             <Route path="/vistorias" element={

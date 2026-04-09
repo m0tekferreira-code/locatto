@@ -1310,6 +1310,104 @@ export type Database = {
           },
         ]
       }
+      webhook_configs: {
+        Row: {
+          id: string
+          account_id: string
+          name: string
+          webhook_url: string
+          is_active: boolean
+          include_tenant_name: boolean
+          include_tenant_document: boolean
+          include_tenant_email: boolean
+          include_tenant_phone: boolean
+          include_property_address: boolean
+          include_contract_number: boolean
+          include_contract_dates: boolean
+          include_contract_value: boolean
+          include_invoice_number: boolean
+          include_invoice_amount: boolean
+          include_invoice_due_date: boolean
+          include_invoice_status: boolean
+          include_invoice_breakdown: boolean
+          include_reference_month: boolean
+          invoice_delivery_mode: string
+          custom_message: string | null
+          http_method: string
+          custom_headers: Json | null
+          auth_type: string
+          auth_token: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          name?: string
+          webhook_url: string
+          is_active?: boolean
+          include_tenant_name?: boolean
+          include_tenant_document?: boolean
+          include_tenant_email?: boolean
+          include_tenant_phone?: boolean
+          include_property_address?: boolean
+          include_contract_number?: boolean
+          include_contract_dates?: boolean
+          include_contract_value?: boolean
+          include_invoice_number?: boolean
+          include_invoice_amount?: boolean
+          include_invoice_due_date?: boolean
+          include_invoice_status?: boolean
+          include_invoice_breakdown?: boolean
+          include_reference_month?: boolean
+          invoice_delivery_mode?: string
+          custom_message?: string | null
+          http_method?: string
+          custom_headers?: Json | null
+          auth_type?: string
+          auth_token?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          name?: string
+          webhook_url?: string
+          is_active?: boolean
+          include_tenant_name?: boolean
+          include_tenant_document?: boolean
+          include_tenant_email?: boolean
+          include_tenant_phone?: boolean
+          include_property_address?: boolean
+          include_contract_number?: boolean
+          include_contract_dates?: boolean
+          include_contract_value?: boolean
+          include_invoice_number?: boolean
+          include_invoice_amount?: boolean
+          include_invoice_due_date?: boolean
+          include_invoice_status?: boolean
+          include_invoice_breakdown?: boolean
+          include_reference_month?: boolean
+          invoice_delivery_mode?: string
+          custom_message?: string | null
+          http_method?: string
+          custom_headers?: Json | null
+          auth_type?: string
+          auth_token?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_configs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null

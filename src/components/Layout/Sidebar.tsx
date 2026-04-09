@@ -86,6 +86,7 @@ const menuItems: MenuItem[] = [
     submenu: [
       { label: "Geral", path: "/configuracoes" },
       { label: "E-mail (SMTP)", path: "/configuracoes/email" },
+      { label: "Webhooks", path: "/configuracoes/webhooks" },
       { label: "Portais Imobiliários", path: "/configuracoes/portais" },
       { label: "Meu Perfil", path: "/configuracoes/perfil" },
     ],

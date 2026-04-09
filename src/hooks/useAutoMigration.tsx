@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 const MIGRATION_CACHE_KEY = "auto_migration_applied";
-const MIGRATION_VERSION = "20260409_smtp_settings";
+const MIGRATION_VERSION = "20260409_webhook_configs";
 
 /**
  * Hook que executa migrations pendentes automaticamente ao acessar o sistema.
