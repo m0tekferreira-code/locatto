@@ -41,7 +41,7 @@ export const InvoicePDFTemplate = React.forwardRef<HTMLDivElement, InvoicePDFTem
           <div className="text-right">
             <div className="bg-slate-100 px-4 py-2 rounded-md inline-block border border-slate-200">
               <p className="text-xs text-slate-500 uppercase font-semibold">Vencimento</p>
-              <p className="text-xl font-bold text-slate-800">{format(new Date(invoice.due_date), "dd/MM/yyyy")}</p>
+              <p className="text-xl font-bold text-slate-800">{invoice.due_date ? format(new Date(invoice.due_date), "dd/MM/yyyy") : "-"}</p>
             </div>
           </div>
         </div>
@@ -86,7 +86,11 @@ export const InvoicePDFTemplate = React.forwardRef<HTMLDivElement, InvoicePDFTem
           </div>
           <div>
             <p className="text-xs text-slate-500 font-semibold uppercase">Emissão</p>
-            <p className="font-bold text-slate-800">{format(new Date(invoice.issue_date), "dd/MM/yyyy")}</p>
+            <p className="font-bold text-slate-800">{invoice.issue_date ? format(new Date(invoice.issue_date), "dd/MM/yyyy") : "-"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 font-semibold uppercase">Vencimento</p>
+            <p className="font-bold text-slate-800">{invoice.due_date ? format(new Date(invoice.due_date), "dd/MM/yyyy") : "-"}</p>
           </div>
           <div>
             <p className="text-xs text-slate-500 font-semibold uppercase">Contrato Nº</p>
