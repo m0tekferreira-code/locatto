@@ -13,8 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { EditInvoiceDialog } from "@/components/Invoices/EditInvoiceDialog";
-import { InvoicePDFTemplate } from "@/components/Invoices/InvoicePDFTemplate";
-import html2pdf from "html2pdf.js";
+import { buildInvoiceHTML } from "@/components/Invoices/buildInvoiceHTML";
 
 const InvoiceDetails = () => {
   const { id } = useParams();
@@ -22,59 +21,21 @@ const InvoiceDetails = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const pdfTemplateRef = React.useRef<HTMLDivElement>(null);
-  const [isExporting, setIsExporting] = useState(false);
 
-  const handleExportPDF = async () => {
-    if (!pdfTemplateRef.current || !invoice) return;
-    setIsExporting(true);
-
-    const element = pdfTemplateRef.current;
-    const prevOpacity = element.style.opacity;
-    const prevZ = element.style.zIndex;
-
-    try {
-      // Make element visible and on top so html2canvas can capture it reliably
-      element.style.opacity = '1';
-      element.style.zIndex = '99999';
-
-      // Wait for layout/paint
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-      const opt = {
-        margin:       0,
-        filename:     `Fatura-${invoice.invoice_number}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          windowWidth: 800,
-          width: 800,
-          scrollX: 0,
-          scrollY: -window.scrollY,
-        },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-
-      await html2pdf().from(element).set(opt).save();
-      
+  const handleExportPDF = () => {
+    if (!invoice) return;
+    const html = buildInvoiceHTML(invoice);
+    const win = window.open("", "_blank");
+    if (!win) {
       toast({
-        title: "PDF gerado com sucesso",
-        description: "O download iniciará em instantes.",
-      });
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: "Erro ao gerar PDF",
-        description: "Ocorreu um erro ao gerar o arquivo.",
+        title: "Pop-up bloqueado",
+        description: "Permita pop-ups para visualizar a fatura.",
         variant: "destructive",
       });
-    } finally {
-      element.style.opacity = prevOpacity || '0';
-      element.style.zIndex = prevZ || '-1';
-      setIsExporting(false);
+      return;
     }
+    win.document.write(html);
+    win.document.close();
   };
 
   const { data: invoice, isLoading } = useQuery({
@@ -288,10 +249,10 @@ const InvoiceDetails = () => {
                 <Button
                   variant="outline"
                   onClick={handleExportPDF}
-                  disabled={isExporting}
                 >
                   <FileDown className="mr-2 h-4 w-4" />
-                  {isExporting ? "Gerando..." : "Exportar PDF"}
+                  Visualizar / Imprimir
+                </Button>
                 </Button>
                 <Button
                   variant="outline"
@@ -649,8 +610,6 @@ const InvoiceDetails = () => {
                 : 0)
             }
           />
-
-          <InvoicePDFTemplate ref={pdfTemplateRef} invoice={invoice} />
       </div>
     </AppLayout>
   );
