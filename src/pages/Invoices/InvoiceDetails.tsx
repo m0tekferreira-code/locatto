@@ -29,17 +29,37 @@ const InvoiceDetails = () => {
     if (!pdfTemplateRef.current || !invoice) return;
     setIsExporting(true);
 
+    const element = pdfTemplateRef.current;
+    // Save and override offscreen positioning so html2canvas captures it visibly
+    const prev = {
+      left: element.style.left,
+      top: element.style.top,
+      position: element.style.position,
+      zIndex: element.style.zIndex,
+      pointerEvents: element.style.pointerEvents,
+    };
+
     try {
-      const element = pdfTemplateRef.current;
-      
-      // Temporarily make it visible for html2pdf
-      element.style.display = 'block';
+      element.style.position = 'fixed';
+      element.style.left = '0px';
+      element.style.top = '0px';
+      element.style.zIndex = '-1';
+      element.style.pointerEvents = 'none';
+
+      // Allow the browser to layout/paint before capturing
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
       const opt = {
         margin:       0,
         filename:     `Fatura-${invoice.invoice_number}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true },
+        html2canvas:  {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          windowWidth: 800,
+          width: 800,
+        },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
@@ -57,10 +77,12 @@ const InvoiceDetails = () => {
         variant: "destructive",
       });
     } finally {
-      // Hide again
-      if (pdfTemplateRef.current) {
-        pdfTemplateRef.current.style.display = 'none';
-      }
+      // Restore offscreen positioning
+      element.style.position = prev.position;
+      element.style.left = prev.left || '-10000px';
+      element.style.top = prev.top || '0';
+      element.style.zIndex = prev.zIndex || '-1';
+      element.style.pointerEvents = prev.pointerEvents || 'none';
       setIsExporting(false);
     }
   };

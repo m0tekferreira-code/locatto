@@ -30,7 +30,19 @@ export const InvoicePDFTemplate = React.forwardRef<HTMLDivElement, InvoicePDFTem
   };
 
   return (
-    <div ref={ref} className="bg-white text-slate-900 p-8 w-[800px] min-h-[1050px] mx-auto hidden-print" style={{ display: 'none' }}>
+    <div
+      ref={ref}
+      className="bg-white text-slate-900 p-8 mx-auto hidden-print"
+      style={{
+        position: 'fixed',
+        left: '-10000px',
+        top: 0,
+        width: '800px',
+        minHeight: '1050px',
+        zIndex: -1,
+        pointerEvents: 'none',
+      }}
+    >
       <div id="pdf-content" className="border border-slate-300 rounded-lg p-8 h-full flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-start border-b border-slate-300 pb-6 mb-6">
