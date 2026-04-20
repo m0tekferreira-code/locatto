@@ -32,13 +32,14 @@ export const InvoicePDFTemplate = React.forwardRef<HTMLDivElement, InvoicePDFTem
   return (
     <div
       ref={ref}
-      className="bg-white text-slate-900 p-8 mx-auto hidden-print"
+      className="bg-white text-slate-900 p-8 hidden-print"
       style={{
         position: 'fixed',
-        left: '-10000px',
+        left: 0,
         top: 0,
         width: '800px',
         minHeight: '1050px',
+        opacity: 0,
         zIndex: -1,
         pointerEvents: 'none',
       }}

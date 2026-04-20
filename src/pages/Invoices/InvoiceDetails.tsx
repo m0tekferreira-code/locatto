@@ -30,23 +30,15 @@ const InvoiceDetails = () => {
     setIsExporting(true);
 
     const element = pdfTemplateRef.current;
-    // Save and override offscreen positioning so html2canvas captures it visibly
-    const prev = {
-      left: element.style.left,
-      top: element.style.top,
-      position: element.style.position,
-      zIndex: element.style.zIndex,
-      pointerEvents: element.style.pointerEvents,
-    };
+    const prevOpacity = element.style.opacity;
+    const prevZ = element.style.zIndex;
 
     try {
-      element.style.position = 'fixed';
-      element.style.left = '0px';
-      element.style.top = '0px';
-      element.style.zIndex = '-1';
-      element.style.pointerEvents = 'none';
+      // Make element visible and on top so html2canvas can capture it reliably
+      element.style.opacity = '1';
+      element.style.zIndex = '99999';
 
-      // Allow the browser to layout/paint before capturing
+      // Wait for layout/paint
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
       const opt = {
@@ -59,6 +51,8 @@ const InvoiceDetails = () => {
           backgroundColor: '#ffffff',
           windowWidth: 800,
           width: 800,
+          scrollX: 0,
+          scrollY: -window.scrollY,
         },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
@@ -77,12 +71,8 @@ const InvoiceDetails = () => {
         variant: "destructive",
       });
     } finally {
-      // Restore offscreen positioning
-      element.style.position = prev.position;
-      element.style.left = prev.left || '-10000px';
-      element.style.top = prev.top || '0';
-      element.style.zIndex = prev.zIndex || '-1';
-      element.style.pointerEvents = prev.pointerEvents || 'none';
+      element.style.opacity = prevOpacity || '0';
+      element.style.zIndex = prevZ || '-1';
       setIsExporting(false);
     }
   };
