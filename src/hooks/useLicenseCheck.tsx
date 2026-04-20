@@ -82,12 +82,16 @@ export const useLicenseCheck = () => {
   };
 
   useEffect(() => {
-    checkLicense();
+    // Delay initial check to let the auth session recover first
+    const timeout = setTimeout(() => checkLicense(), 1500);
 
     // Check every 10 minutes
     const interval = setInterval(() => checkLicense(true), CACHE_DURATION);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
   }, []);
 
   return status;

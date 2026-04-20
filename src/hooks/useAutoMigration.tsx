@@ -26,21 +26,21 @@ export function useAutoMigration() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) return;
 
-        const { data, error } = await supabase.functions.invoke("auto-migrate", {
+        const response = await supabase.functions.invoke("auto-migrate", {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
           },
         });
 
-        if (error) {
-          console.warn("Auto-migration call failed:", error.message);
+        if (response.error) {
+          // Silently ignore CORS / network / deployment errors — non-blocking
           return;
         }
 
-        console.log("Auto-migration result:", data);
+        console.log("Auto-migration result:", response.data);
         localStorage.setItem(MIGRATION_CACHE_KEY, MIGRATION_VERSION);
-      } catch (err) {
-        console.warn("Auto-migration error (non-blocking):", err);
+      } catch {
+        // Silently ignore — auto-migration is best-effort
       }
     };
 
