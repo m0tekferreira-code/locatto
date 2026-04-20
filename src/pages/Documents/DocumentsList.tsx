@@ -84,6 +84,7 @@ const DocumentsList = () => {
   const [importDocsOpen, setImportDocsOpen] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [docSearch, setDocSearch] = useState("");
+  const [closedSearch, setClosedSearch] = useState("");
   const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
   const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -219,6 +220,71 @@ const DocumentsList = () => {
 
   const activeContracts = contracts.filter(c => c.status === "active");
   const closedContracts = contracts.filter(c => c.status !== "active");
+
+  // Buscar eventos de encerramento (motivo da rescisão) para os contratos encerrados
+  const closedContractIds = closedContracts.map((c) => c.id);
+  const { data: terminationEvents = [] } = useQuery({
+    queryKey: ["contract-terminations", closedContractIds],
+    queryFn: async () => {
+      if (closedContractIds.length === 0) return [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("contract_history")
+        .select("contract_id, description, metadata, created_at")
+        .in("contract_id", closedContractIds)
+        .eq("event_type", "contract_terminated")
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error("Erro ao buscar eventos de encerramento:", error);
+        return [];
+      }
+      return data || [];
+    },
+    enabled: closedContractIds.length > 0,
+  });
+
+  const terminationByContract = new Map<string, any>();
+  for (const ev of terminationEvents as any[]) {
+    if (!terminationByContract.has(ev.contract_id)) {
+      terminationByContract.set(ev.contract_id, ev);
+    }
+  }
+
+  const reasonLabels: Record<string, string> = {
+    rescisao_inquilino: "Rescisão pelo Inquilino",
+    rescisao_proprietario: "Rescisão pelo Proprietário",
+    fim_contrato: "Fim do Contrato",
+    rescisao_negociada: "Rescisão Negociada",
+    inadimplencia: "Inadimplência",
+    outros: "Outros",
+  };
+
+  const closedStatusLabels: Record<string, string> = {
+    terminated: "Encerrado",
+    cancelled: "Cancelado",
+    expired: "Vencido",
+  };
+
+  const filteredClosedContracts = closedContracts.filter((contract) => {
+    if (!closedSearch) return true;
+    const term = closedSearch.toLowerCase();
+    const ev = terminationByContract.get(contract.id);
+    const reasonRaw = (ev?.metadata as any)?.reason as string | undefined;
+    const reasonLabel = reasonRaw ? (reasonLabels[reasonRaw] || reasonRaw).toLowerCase() : "";
+    const notes = ((ev?.metadata as any)?.notes as string | undefined)?.toLowerCase() || "";
+    return (
+      contract.tenant_name?.toLowerCase().includes(term) ||
+      contract.contract_number?.toLowerCase().includes(term) ||
+      contract.tenant_document?.toLowerCase().includes(term) ||
+      contract.tenant_phone?.toLowerCase().includes(term) ||
+      contract.tenant_email?.toLowerCase().includes(term) ||
+      contract.properties?.name?.toLowerCase().includes(term) ||
+      contract.properties?.address?.toLowerCase().includes(term) ||
+      contract.properties?.city?.toLowerCase().includes(term) ||
+      reasonLabel.includes(term) ||
+      notes.includes(term)
+    );
+  });
 
   const allDocuments = contracts.flatMap(contract => {
     const docs = Array.isArray((contract as any).documents) ? (contract as any).documents as any[] : [];
@@ -527,31 +593,146 @@ const DocumentsList = () => {
 
               <TabsContent value="encerrados" className="space-y-6 mt-6">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Contratos Encerrados</CardTitle>
+                  <CardHeader className="flex flex-row items-center justify-between gap-4">
+                    <div>
+                      <CardTitle>Contratos Encerrados</CardTitle>
+                      <CardDescription>
+                        Histórico de contratos finalizados, com motivo da rescisão e documentos
+                      </CardDescription>
+                    </div>
+                    <Badge variant="secondary">
+                      {closedContracts.length} contrato{closedContracts.length !== 1 ? "s" : ""}
+                    </Badge>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-4">
+                    <div className="relative max-w-md">
+                      <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar por inquilino, imóvel, nº do contrato ou motivo..."
+                        value={closedSearch}
+                        onChange={(e) => setClosedSearch(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+
                     {closedContracts.length === 0 ? (
                       <p className="text-center text-muted-foreground py-8">
                         Nenhum contrato encerrado encontrado
                       </p>
+                    ) : filteredClosedContracts.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">
+                        Nenhum contrato encerrado encontrado para "{closedSearch}"
+                      </p>
                     ) : (
-                      <div className="space-y-4">
-                        {closedContracts.map((contract) => (
-                          <Card key={contract.id}>
-                            <CardContent className="p-4">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="font-medium">{contract.tenant_name}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {contract.properties?.name}
-                                  </p>
+                      <div className="space-y-3">
+                        {filteredClosedContracts.map((contract) => {
+                          const ev = terminationByContract.get(contract.id);
+                          const reasonRaw = (ev?.metadata as any)?.reason as string | undefined;
+                          const reasonLabel = reasonRaw
+                            ? reasonLabels[reasonRaw] || reasonRaw
+                            : null;
+                          const notes = (ev?.metadata as any)?.notes as string | undefined;
+                          const terminationDate =
+                            ((ev?.metadata as any)?.date as string | undefined) ||
+                            contract.end_date;
+                          const docs = Array.isArray((contract as any).documents)
+                            ? ((contract as any).documents as any[])
+                            : [];
+                          const statusLabel =
+                            closedStatusLabels[contract.status] || contract.status;
+
+                          return (
+                            <Card
+                              key={contract.id}
+                              className="hover:shadow-md transition-shadow"
+                            >
+                              <CardContent className="p-4 space-y-3">
+                                <div className="flex items-start justify-between gap-4 flex-wrap">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <p className="font-semibold text-base">
+                                        {contract.tenant_name}
+                                      </p>
+                                      <Badge variant="destructive">{statusLabel}</Badge>
+                                      {contract.contract_number && (
+                                        <Badge variant="outline" className="text-xs">
+                                          # {contract.contract_number}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {contract.properties?.name && (
+                                      <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                        <Building2 className="h-3 w-3" />
+                                        {contract.properties.name}
+                                        {contract.properties.address &&
+                                          ` — ${contract.properties.address}`}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        navigate(`/contratos/${contract.id}`)
+                                      }
+                                    >
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      Ver Detalhes
+                                    </Button>
+                                  </div>
                                 </div>
-                                <Badge variant="secondary">{contract.status}</Badge>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm border-t pt-3">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      Encerrado em
+                                    </p>
+                                    <p className="font-medium flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      {terminationDate
+                                        ? parseLocalDate(
+                                            terminationDate
+                                          ).toLocaleDateString("pt-BR")
+                                        : "—"}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      Motivo da rescisão
+                                    </p>
+                                    <p className="font-medium">
+                                      {reasonLabel || (
+                                        <span className="text-muted-foreground">
+                                          Não informado
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      Documentos anexados
+                                    </p>
+                                    <p className="font-medium flex items-center gap-1">
+                                      <Paperclip className="h-3 w-3" />
+                                      {docs.length} arquivo
+                                      {docs.length !== 1 ? "s" : ""}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {notes && (
+                                  <div className="text-sm bg-muted/50 rounded-md p-3 border">
+                                    <p className="text-xs text-muted-foreground mb-1">
+                                      Observações do encerramento
+                                    </p>
+                                    <p className="whitespace-pre-wrap">{notes}</p>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
