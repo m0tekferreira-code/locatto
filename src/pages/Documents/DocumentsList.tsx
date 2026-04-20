@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { parseLocalDate } from "@/lib/utils";
 import { AppLayout } from "@/components/Layout/AppLayout";
@@ -85,6 +85,9 @@ const DocumentsList = () => {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [docSearch, setDocSearch] = useState("");
   const [closedSearch, setClosedSearch] = useState("");
+  const [closedSort, setClosedSort] = useState<"recent" | "oldest" | "name">("recent");
+  const [closedPageSize, setClosedPageSize] = useState<number>(10);
+  const [closedPage, setClosedPage] = useState<number>(1);
   const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
   const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -285,6 +288,43 @@ const DocumentsList = () => {
       notes.includes(term)
     );
   });
+
+  const getClosedDateValue = (contract: any): number => {
+    const ev = terminationByContract.get(contract.id);
+    const dateStr =
+      ((ev?.metadata as any)?.date as string | undefined) ||
+      ev?.created_at ||
+      contract.end_date ||
+      contract.updated_at ||
+      contract.created_at;
+    if (!dateStr) return 0;
+    const t = new Date(dateStr).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+
+  const sortedClosedContracts = [...filteredClosedContracts].sort((a, b) => {
+    if (closedSort === "name") {
+      return (a.tenant_name || "").localeCompare(b.tenant_name || "", "pt-BR");
+    }
+    const da = getClosedDateValue(a);
+    const db = getClosedDateValue(b);
+    return closedSort === "recent" ? db - da : da - db;
+  });
+
+  const closedTotalPages = Math.max(
+    1,
+    Math.ceil(sortedClosedContracts.length / closedPageSize)
+  );
+  const safeClosedPage = Math.min(closedPage, closedTotalPages);
+  const paginatedClosedContracts = sortedClosedContracts.slice(
+    (safeClosedPage - 1) * closedPageSize,
+    safeClosedPage * closedPageSize
+  );
+
+  // Reset page when filters change
+  useEffect(() => {
+    setClosedPage(1);
+  }, [closedSearch, closedSort, closedPageSize]);
 
   const allDocuments = contracts.flatMap(contract => {
     const docs = Array.isArray((contract as any).documents) ? (contract as any).documents as any[] : [];
@@ -605,27 +645,57 @@ const DocumentsList = () => {
                     </Badge>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="relative max-w-md">
-                      <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Buscar por inquilino, imóvel, nº do contrato ou motivo..."
-                        value={closedSearch}
-                        onChange={(e) => setClosedSearch(e.target.value)}
-                        className="pl-10"
-                      />
+                    <div className="flex flex-col md:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar por inquilino, imóvel, nº do contrato ou motivo..."
+                          value={closedSearch}
+                          onChange={(e) => setClosedSearch(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Select
+                        value={closedSort}
+                        onValueChange={(v) =>
+                          setClosedSort(v as "recent" | "oldest" | "name")
+                        }
+                      >
+                        <SelectTrigger className="w-full md:w-[200px]">
+                          <SelectValue placeholder="Ordenar por" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="recent">Mais recentes</SelectItem>
+                          <SelectItem value="oldest">Mais antigos</SelectItem>
+                          <SelectItem value="name">Nome (A-Z)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={String(closedPageSize)}
+                        onValueChange={(v) => setClosedPageSize(Number(v))}
+                      >
+                        <SelectTrigger className="w-full md:w-[160px]">
+                          <SelectValue placeholder="Itens por página" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10 por página</SelectItem>
+                          <SelectItem value="50">50 por página</SelectItem>
+                          <SelectItem value="100">100 por página</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {closedContracts.length === 0 ? (
                       <p className="text-center text-muted-foreground py-8">
                         Nenhum contrato encerrado encontrado
                       </p>
-                    ) : filteredClosedContracts.length === 0 ? (
+                    ) : sortedClosedContracts.length === 0 ? (
                       <p className="text-center text-muted-foreground py-8">
                         Nenhum contrato encerrado encontrado para "{closedSearch}"
                       </p>
                     ) : (
                       <div className="space-y-3">
-                        {filteredClosedContracts.map((contract) => {
+                        {paginatedClosedContracts.map((contract) => {
                           const ev = terminationByContract.get(contract.id);
                           const reasonRaw = (ev?.metadata as any)?.reason as string | undefined;
                           const reasonLabel = reasonRaw
@@ -733,6 +803,50 @@ const DocumentsList = () => {
                             </Card>
                           );
                         })}
+                      </div>
+                    )}
+
+                    {sortedClosedContracts.length > 0 && (
+                      <div className="flex flex-col md:flex-row items-center justify-between gap-3 pt-2 border-t">
+                        <p className="text-sm text-muted-foreground">
+                          Mostrando{" "}
+                          <strong>
+                            {(safeClosedPage - 1) * closedPageSize + 1}
+                          </strong>
+                          {"–"}
+                          <strong>
+                            {Math.min(
+                              safeClosedPage * closedPageSize,
+                              sortedClosedContracts.length
+                            )}
+                          </strong>{" "}
+                          de <strong>{sortedClosedContracts.length}</strong> contrato
+                          {sortedClosedContracts.length !== 1 ? "s" : ""}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={safeClosedPage <= 1}
+                            onClick={() => setClosedPage((p) => Math.max(1, p - 1))}
+                          >
+                            Anterior
+                          </Button>
+                          <span className="text-sm">
+                            Página <strong>{safeClosedPage}</strong> de{" "}
+                            <strong>{closedTotalPages}</strong>
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={safeClosedPage >= closedTotalPages}
+                            onClick={() =>
+                              setClosedPage((p) => Math.min(closedTotalPages, p + 1))
+                            }
+                          >
+                            Próxima
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </CardContent>
