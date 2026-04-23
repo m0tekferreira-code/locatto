@@ -159,12 +159,6 @@ export const InvoicePDFTemplate = React.forwardRef<HTMLDivElement, InvoicePDFTem
                   <td className="py-3 px-3 text-right text-slate-700">{formatCurrency(invoice.internet_amount)}</td>
                 </tr>
               )}
-              {Number(invoice.cleaning_fee) > 0 && (
-                <tr className="border-b border-slate-200">
-                  <td className="py-3 px-3 font-medium text-slate-700">Taxa de Limpeza/Adicional</td>
-                  <td className="py-3 px-3 text-right text-slate-700">{formatCurrency(invoice.cleaning_fee)}</td>
-                </tr>
-              )}
               {Number(invoice.guarantee_installment) > 0 && (
                 <tr className="border-b border-slate-200">
                   <td className="py-3 px-3 font-medium text-slate-700">
@@ -174,13 +168,20 @@ export const InvoicePDFTemplate = React.forwardRef<HTMLDivElement, InvoicePDFTem
                 </tr>
               )}
               
-              {/* Extra Charges */}
+              {/* Extra Charges and Additional Fees */}
               {invoice.extra_charges && Array.isArray(invoice.extra_charges) && invoice.extra_charges.length > 0 && invoice.extra_charges.map((charge: any, idx: number) => (
                 <tr key={idx} className="border-b border-slate-200">
                   <td className="py-3 px-3 font-medium text-slate-700">{charge.description || "Cobrança Adicional"}</td>
                   <td className="py-3 px-3 text-right text-slate-700">{formatCurrency(charge.value_per_installment || charge.value || charge.amount || 0)}</td>
                 </tr>
               ))}
+              
+              {Number(invoice.cleaning_fee) > 0 && (
+                <tr className="border-b border-slate-200">
+                  <td className="py-3 px-3 font-medium text-slate-700">Taxa de Limpeza/Adicional</td>
+                  <td className="py-3 px-3 text-right text-slate-700">{formatCurrency(invoice.cleaning_fee)}</td>
+                </tr>
+              )}
               
               {/* Discounts */}
               {Number(invoice.discount_amount) > 0 && (
