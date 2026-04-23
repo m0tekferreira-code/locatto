@@ -51,7 +51,7 @@ export function buildInvoiceHTML(invoice: any): string {
   if (Number(invoice.internet_amount) > 0)
     lines.push({ description: "Internet", value: formatCurrency(invoice.internet_amount) });
   if (Number(invoice.cleaning_fee) > 0)
-    lines.push({ description: "Taxa de Limpeza/Adicional", value: formatCurrency(invoice.cleaning_fee) });
+    lines.push({ description: "Estacionamento", value: formatCurrency(invoice.cleaning_fee) });
 
   if (Number(invoice.guarantee_installment) > 0) {
     let label = "Parcela de Garantia";

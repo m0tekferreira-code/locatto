@@ -178,7 +178,7 @@ export const InvoicePDFTemplate = React.forwardRef<HTMLDivElement, InvoicePDFTem
               
               {Number(invoice.cleaning_fee) > 0 && (
                 <tr className="border-b border-slate-200">
-                  <td className="py-3 px-3 font-medium text-slate-700">Taxa de Limpeza/Adicional</td>
+                  <td className="py-3 px-3 font-medium text-slate-700">Estacionamento</td>
                   <td className="py-3 px-3 text-right text-slate-700">{formatCurrency(invoice.cleaning_fee)}</td>
                 </tr>
               )}
